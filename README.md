@@ -61,3 +61,4 @@ npm run preview
 - **Tooling**: Vite 6
 - **Styling**: Tailwind CSS, Lucide Icons
 - **Simulation**: Custom React Hooks & SVG Animation Engine
+

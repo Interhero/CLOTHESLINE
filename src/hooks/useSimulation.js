@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { IoTCloudSync } from '../services/iotCloudSync';
 
 const MODES = {
   'Quick Dry':        { fan: 3, rod: 100, timer: 90, loadKg: 2.4 },
@@ -31,15 +32,30 @@ const INITIAL_STATE = {
 
 const FAN_LABELS = ['OFF', 'Low', 'Medium', 'High'];
 
+const getInitialHomeId = () => {
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    const h = params.get('home') || params.get('room');
+    if (h && h.trim()) return h.trim().toLowerCase();
+  }
+  return 'ent600-home';
+};
+
 export { MODES, INITIAL_STATE, FAN_LABELS };
 
 export default function useSimulation() {
   const [state, setState] = useState({ ...INITIAL_STATE });
   const [alerts, setAlerts] = useState([]);
-  const alertIdRef = useRef(0);
-  const rodAnimRef = useRef(null);
+  const [homeId, setHomeIdState] = useState(getInitialHomeId);
+  const [syncStatus, setSyncStatus] = useState('connecting'); // connecting | connected | offline
 
-  // ─── helpers ────────────────────────────────────────
+  const alertIdRef = useRef(0);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const iotSyncRef = useRef(null);
+
+  // ─── alerts helper ──────────────────────────────────
   const addAlert = useCallback((level, message) => {
     const id = ++alertIdRef.current;
     const alert = { id, level, message, time: new Date() };
@@ -70,7 +86,6 @@ export default function useSimulation() {
     const interval = setInterval(() => {
       setState(prev => {
         if (prev.motorStatus !== 'Moving') {
-          // If folded and fan is running, auto shut off
           if (prev.rodPositionPercent <= 5 && prev.fanSpeed > 0) {
             addAlert('info', 'Rack folded against wall: Fan automatically shut off.');
             return { ...prev, fanSpeed: 0 };
@@ -106,11 +121,16 @@ export default function useSimulation() {
     return () => clearInterval(interval);
   }, [addAlert]);
 
-  // ─── controls ───────────────────────────────────────
-  const togglePower = useCallback(() => {
+  // ─── core action executors (local vs remote) ───────
+  const execTogglePower = useCallback((isRemote = false) => {
     setState(prev => {
       const next = !prev.systemPower;
-      addAlert('info', next ? 'Smart Rack online: Standby.' : 'Smart Rack offline.');
+      if (!isRemote) {
+        addAlert('info', next ? 'Smart Rack online: Standby.' : 'Smart Rack offline.');
+        iotSyncRef.current?.publishAction('TOGGLE_POWER', { systemPower: next });
+      } else {
+        addAlert('info', next ? '📱 Remote: Smart Rack powered ON.' : '📱 Remote: Smart Rack turned OFF.');
+      }
       if (!next) {
         return { ...prev, systemPower: false, fanSpeed: 0, motorStatus: 'Idle', timerRunning: false };
       }
@@ -118,30 +138,26 @@ export default function useSimulation() {
     });
   }, [addAlert]);
 
-  const setFanSpeed = useCallback((speed) => {
+  const execSetFanSpeed = useCallback((speed, isRemote = false) => {
     setState(prev => {
       if (!prev.systemPower) return prev;
       if (prev.rodPositionPercent <= 5 && speed > 0) {
-        addAlert('info', 'Rack is folded against wall. Extend rack before turning on fan.');
+        if (!isRemote) {
+          addAlert('info', 'Rack is folded against wall. Extend rack before turning on fan.');
+        }
         return prev;
       }
-      addAlert('info', `Fan speed set to ${FAN_LABELS[speed]}.`);
+      if (!isRemote) {
+        addAlert('info', `Fan speed set to ${FAN_LABELS[speed]}.`);
+        iotSyncRef.current?.publishAction('SET_FAN_SPEED', { speed });
+      } else {
+        addAlert('info', `📱 Remote: Fan speed set to ${FAN_LABELS[speed]}.`);
+      }
       return { ...prev, fanSpeed: speed };
     });
   }, [addAlert]);
 
-  const openRods = useCallback(() => {
-    addAlert('info', 'Opening drying rods.');
-    animateRod(100);
-  }, [addAlert, animateRod]);
-
-  const foldRods = useCallback(() => {
-    addAlert('info', 'Folding drying rods to wall. Fan automatically shut off.');
-    setState(prev => ({ ...prev, fanSpeed: 0 }));
-    animateRod(0);
-  }, [addAlert, animateRod]);
-
-  const setRodTarget = useCallback((pct) => {
+  const execSetRodTarget = useCallback((pct, isRemote = false) => {
     if (pct <= 5) {
       setState(prev => {
         if (prev.fanSpeed > 0) {
@@ -151,10 +167,15 @@ export default function useSimulation() {
         return prev;
       });
     }
+    if (!isRemote) {
+      iotSyncRef.current?.publishAction('SET_ROD_TARGET', { percent: pct });
+    } else {
+      addAlert('info', `📱 Remote: Rack stroke adjusted to ${Math.round(pct)}%.`);
+    }
     animateRod(pct);
   }, [animateRod, addAlert]);
 
-  const setPowerStateDemo = useCallback((targetState) => {
+  const execSetPowerStateDemo = useCallback((targetState, isRemote = false) => {
     if (targetState === 'Standby') {
       setState(prev => ({
         ...prev,
@@ -163,7 +184,12 @@ export default function useSimulation() {
         timerRunning: false,
         motorStatus: 'Idle'
       }));
-      addAlert('info', 'Scene Demo: System is in STANDBY (Connected, ready).');
+      if (!isRemote) {
+        addAlert('info', 'Scene Demo: System is in STANDBY (Connected, ready).');
+        iotSyncRef.current?.publishAction('SET_POWER_STATE_DEMO', { targetState });
+      } else {
+        addAlert('info', '📱 Remote: System switched to STANDBY.');
+      }
     } else if (targetState === 'Online') {
       setState(prev => {
         const nextPos = prev.rodPositionPercent <= 5 ? 75 : prev.rodPositionPercent;
@@ -177,7 +203,12 @@ export default function useSimulation() {
           motorStatus: 'Idle'
         };
       });
-      addAlert('info', 'Scene Demo: System is ONLINE (Active drying cycle).');
+      if (!isRemote) {
+        addAlert('info', 'Scene Demo: System is ONLINE (Active drying cycle).');
+        iotSyncRef.current?.publishAction('SET_POWER_STATE_DEMO', { targetState });
+      } else {
+        addAlert('info', '📱 Remote: System switched to ONLINE.');
+      }
     } else if (targetState === 'Offline') {
       setState(prev => ({
         ...prev,
@@ -186,32 +217,44 @@ export default function useSimulation() {
         timerRunning: false,
         motorStatus: 'Idle'
       }));
-      addAlert('info', 'Scene Demo: System is OFFLINE (Power disconnected).');
+      if (!isRemote) {
+        addAlert('info', 'Scene Demo: System is OFFLINE (Power disconnected).');
+        iotSyncRef.current?.publishAction('SET_POWER_STATE_DEMO', { targetState });
+      } else {
+        addAlert('info', '📱 Remote: System switched to OFFLINE.');
+      }
     }
   }, [addAlert]);
 
-  const emergencyStopToggle = useCallback(() => {
+  const execEmergencyStopToggle = useCallback((isRemote = false) => {
     setState(prev => {
       const stopping = !prev.emergencyStop;
       if (stopping) {
-        addAlert('critical', 'Emergency Stop activated. All movement halted.');
+        addAlert('critical', isRemote ? '🚨 Remote Action: Emergency Stop triggered!' : 'Emergency Stop activated. All movement halted.');
+        if (!isRemote) iotSyncRef.current?.publishAction('EMERGENCY_STOP', { emergencyStop: true });
         return { ...prev, emergencyStop: true, motorStatus: 'Stopped', timerRunning: false };
       }
-      addAlert('info', 'Emergency Stop released.');
+      addAlert('info', isRemote ? '📱 Remote: Emergency Stop released.' : 'Emergency Stop released.');
+      if (!isRemote) iotSyncRef.current?.publishAction('EMERGENCY_STOP', { emergencyStop: false });
       return { ...prev, emergencyStop: false, motorStatus: 'Idle' };
     });
   }, [addAlert]);
 
-  const selectMode = useCallback((modeName) => {
+  const execSelectMode = useCallback((modeName, isRemote = false) => {
     const mode = MODES[modeName];
     if (!mode) return;
     setState(prev => {
       if (!prev.systemPower) return prev;
       const targetLoad = mode.loadKg ?? prev.laundryLoadKg;
-      if (modeName === 'Heavy Laundry') {
-        addAlert('info', `Scene set: Heavy Laundry. Load sensor updated to ${targetLoad} kg (92% load).`);
+      if (!isRemote) {
+        if (modeName === 'Heavy Laundry') {
+          addAlert('info', `Scene set: Heavy Laundry. Load sensor updated to ${targetLoad} kg (92% load).`);
+        } else {
+          addAlert('info', `Mode activated: ${modeName} (${targetLoad} kg load).`);
+        }
+        iotSyncRef.current?.publishAction('SELECT_MODE', { modeName });
       } else {
-        addAlert('info', `Mode activated: ${modeName} (${targetLoad} kg load).`);
+        addAlert('info', `📱 Remote: Scene changed to ${modeName}.`);
       }
       return {
         ...prev,
@@ -227,92 +270,151 @@ export default function useSimulation() {
     animateRod(mode.rod);
   }, [addAlert, animateRod]);
 
-  const setTimer = useCallback((minutes) => {
-    setState(prev => ({
-      ...prev,
-      remainingMinutes: minutes,
-      totalMinutes: minutes,
-      dryingProgressPercent: 0,
-    }));
-  }, []);
-
-  const toggleTimer = useCallback(() => {
+  const execToggleAutoRain = useCallback((isRemote = false) => {
     setState(prev => {
-      if (!prev.systemPower) return prev;
-      return { ...prev, timerRunning: !prev.timerRunning };
+      const next = !prev.autoRainProtection;
+      if (!isRemote) iotSyncRef.current?.publishAction('TOGGLE_AUTO_RAIN', { autoRainProtection: next });
+      return { ...prev, autoRainProtection: next };
     });
   }, []);
 
-  const toggleAutoRain = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      autoRainProtection: !prev.autoRainProtection,
-    }));
-  }, []);
-
-  // ─── simulation triggers (demo) ────────────────────
-  const simulateRain = useCallback((on) => {
+  const execSimulateRain = useCallback((on, isRemote = false) => {
     setState(prev => {
       if (on && !prev.rainDetected) {
-        addAlert('high', 'Rain detected. Retracting clothes under the roof.');
+        addAlert('high', isRemote ? '🌧 Remote: Rain detected! Retracting to shelter.' : 'Rain detected. Retracting clothes under the roof.');
         const next = { ...prev, rainDetected: true };
         if (prev.autoRainProtection && prev.systemPower) {
           next.rodTargetPercent = prev.shelteredPositionPercent;
           next.motorStatus = 'Moving';
         }
+        if (!isRemote) iotSyncRef.current?.publishAction('SIMULATE_RAIN', { on: true });
         return next;
       }
       if (!on && prev.rainDetected) {
-        addAlert('info', 'Rain stopped. Dry weather resumed.');
+        addAlert('info', isRemote ? '☀️ Remote: Rain cleared.' : 'Rain stopped. Dry weather resumed.');
+        if (!isRemote) iotSyncRef.current?.publishAction('SIMULATE_RAIN', { on: false });
         return { ...prev, rainDetected: false };
       }
       return prev;
     });
   }, [addAlert]);
 
-  const simulateObstacle = useCallback((on) => {
+  const execSimulateObstacle = useCallback((on, isRemote = false) => {
     setState(prev => {
       if (on) {
-        addAlert('critical', 'Movement stopped. Please check the drying rack.');
+        addAlert('critical', isRemote ? '⚠️ Remote: Obstacle sensor tripped!' : 'Movement stopped. Please check the drying rack.');
+        if (!isRemote) iotSyncRef.current?.publishAction('SIMULATE_OBSTACLE', { on: true });
         return { ...prev, obstacleDetected: true, motorStatus: 'Stopped' };
       }
-      addAlert('info', 'Obstacle cleared.');
+      addAlert('info', isRemote ? '✅ Remote: Obstacle cleared.' : 'Obstacle cleared.');
+      if (!isRemote) iotSyncRef.current?.publishAction('SIMULATE_OBSTACLE', { on: false });
       return { ...prev, obstacleDetected: false, motorStatus: 'Idle' };
     });
   }, [addAlert]);
 
-  const simulateOverload = useCallback((kg) => {
-    setState(prev => {
-      const next = { ...prev, laundryLoadKg: kg };
-      if (kg > 4 && kg <= 5) {
-        addAlert('medium', 'Laundry load approaching recommended limit.');
-      } else if (kg > 5) {
-        addAlert('critical', 'Laundry load exceeds the recommended simulation limit.');
-        next.motorStatus = 'Fault';
-      }
-      return next;
-    });
-  }, [addAlert]);
-
-  const setTemperature = useCallback((t) => {
-    setState(prev => {
-      if (t > 40) addAlert('medium', 'High ambient temperature detected.');
-      return { ...prev, temperatureC: t };
-    });
-  }, [addAlert]);
-
-  const setHumidity = useCallback((h) => {
-    setState(prev => {
-      if (h > 75) addAlert('medium', 'High humidity detected. Drying may take longer.');
-      return { ...prev, humidityPercent: h };
-    });
-  }, [addAlert]);
-
-  const resetDemo = useCallback(() => {
+  const execResetDemo = useCallback((isRemote = false) => {
     setState({ ...INITIAL_STATE });
     setAlerts([]);
-    addAlert('info', 'Demo reset to initial state.');
+    if (!isRemote) {
+      addAlert('info', 'Demo reset to initial state.');
+      iotSyncRef.current?.publishAction('RESET_DEMO', {});
+    } else {
+      addAlert('info', '📱 Remote: Demo reset to initial defaults.');
+    }
   }, [addAlert]);
+
+  // ─── initialize cloud synchronization ───────────────
+  useEffect(() => {
+    const handleRemoteAction = (action) => {
+      const { type, payload } = action;
+
+      if (type === 'PEER_REQUESTED_STATE') {
+        // Broadcast current state so newly connected device catches up immediately
+        iotSyncRef.current?.broadcastState(stateRef.current);
+        return;
+      }
+
+      switch (type) {
+        case 'TOGGLE_POWER':
+          execTogglePower(true);
+          break;
+        case 'SET_FAN_SPEED':
+          execSetFanSpeed(payload.speed, true);
+          break;
+        case 'SET_ROD_TARGET':
+          execSetRodTarget(payload.percent, true);
+          break;
+        case 'SET_POWER_STATE_DEMO':
+          execSetPowerStateDemo(payload.targetState, true);
+          break;
+        case 'EMERGENCY_STOP':
+          execEmergencyStopToggle(true);
+          break;
+        case 'SELECT_MODE':
+          execSelectMode(payload.modeName, true);
+          break;
+        case 'TOGGLE_AUTO_RAIN':
+          execToggleAutoRain(true);
+          break;
+        case 'SIMULATE_RAIN':
+          execSimulateRain(payload.on, true);
+          break;
+        case 'SIMULATE_OBSTACLE':
+          execSimulateObstacle(payload.on, true);
+          break;
+        case 'RESET_DEMO':
+          execResetDemo(true);
+          break;
+        default:
+          break;
+      }
+    };
+
+    const handleStateSnapshot = (incomingState) => {
+      if (!incomingState) return;
+      setState(prev => ({
+        ...prev,
+        ...incomingState,
+      }));
+      addAlert('info', '☁️ Synced live state from Home Cloud.');
+    };
+
+    const sync = new IoTCloudSync(
+      homeId,
+      handleRemoteAction,
+      handleStateSnapshot,
+      (status) => setSyncStatus(status)
+    );
+    iotSyncRef.current = sync;
+
+    return () => {
+      sync.destroy();
+    };
+  }, [
+    homeId,
+    execTogglePower,
+    execSetFanSpeed,
+    execSetRodTarget,
+    execSetPowerStateDemo,
+    execEmergencyStopToggle,
+    execSelectMode,
+    execToggleAutoRain,
+    execSimulateRain,
+    execSimulateObstacle,
+    execResetDemo,
+    addAlert
+  ]);
+
+  // Function to switch smart home room network
+  const setHomeId = useCallback((newId) => {
+    const cleanId = (newId || 'ent600-home').trim().toLowerCase();
+    setHomeIdState(cleanId);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('home', cleanId);
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, []);
 
   // ─── timer & telemetry tick (1s) ────────────────────
   useEffect(() => {
@@ -330,7 +432,6 @@ export default function useSimulation() {
             next.fanSpeed = 0;
             addAlert('info', 'Drying timer completed.');
           }
-          // drying progress
           if (prev.totalMinutes > 0) {
             const elapsed = prev.totalMinutes - next.remainingMinutes;
             const humidityFactor = 1 - (prev.humidityPercent - 50) / 200;
@@ -342,7 +443,7 @@ export default function useSimulation() {
           }
         }
 
-        // gentle telemetry drift
+        // gentle ambient drift
         next.temperatureC = +(prev.temperatureC + (Math.random() - 0.5) * 0.3).toFixed(1);
         next.temperatureC = Math.max(15, Math.min(45, next.temperatureC));
         next.humidityPercent = +(prev.humidityPercent + (Math.random() - 0.5) * 0.5).toFixed(1);
@@ -354,28 +455,37 @@ export default function useSimulation() {
     return () => clearInterval(interval);
   }, [addAlert]);
 
+  // Periodic state snapshot broadcast to broker (retained) so any fresh browser tab joins seamlessly
+  useEffect(() => {
+    const broadcastInterval = setInterval(() => {
+      if (iotSyncRef.current && syncStatus === 'connected') {
+        iotSyncRef.current.broadcastState(stateRef.current);
+      }
+    }, 4000);
+    return () => clearInterval(broadcastInterval);
+  }, [syncStatus]);
+
   return {
     state,
     alerts,
+    // sync info
+    homeId,
+    setHomeId,
+    syncStatus,
     // controls
-    togglePower,
-    setFanSpeed,
-    openRods,
-    foldRods,
-    setRodTarget,
-    emergencyStopToggle,
-    selectMode,
-    setTimer,
-    toggleTimer,
-    toggleAutoRain,
+    togglePower: () => execTogglePower(false),
+    setFanSpeed: (s) => execSetFanSpeed(s, false),
+    openRods: () => execSetRodTarget(100, false),
+    foldRods: () => execSetRodTarget(0, false),
+    setRodTarget: (pct) => execSetRodTarget(pct, false),
+    emergencyStopToggle: () => execEmergencyStopToggle(false),
+    selectMode: (m) => execSelectMode(m, false),
+    toggleAutoRain: () => execToggleAutoRain(false),
     // demo
-    setPowerStateDemo,
-    simulateRain,
-    simulateObstacle,
-    simulateOverload,
-    setTemperature,
-    setHumidity,
-    resetDemo,
+    setPowerStateDemo: (s) => execSetPowerStateDemo(s, false),
+    simulateRain: (on) => execSimulateRain(on, false),
+    simulateObstacle: (on) => execSimulateObstacle(on, false),
+    resetDemo: () => execResetDemo(false),
     // alerts
     dismissAlert,
     clearAlerts,

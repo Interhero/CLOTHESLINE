@@ -13,6 +13,29 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState(
     new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   );
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [roomInput, setRoomInput] = useState(sim.homeId);
+
+  const shareUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}${window.location.pathname}?home=${sim.homeId}`
+    : '';
+
+  const handleCopyLink = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
+  };
+
+  const handleRoomSubmit = (e) => {
+    e.preventDefault();
+    if (roomInput && roomInput.trim()) {
+      sim.setHomeId(roomInput.trim());
+      setShowSyncModal(false);
+    }
+  };
 
   const powerState = !state.systemPower
     ? 'Offline'
@@ -46,6 +69,30 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Real-Time Multi-Device Cloud Sync Pill */}
+            <button
+              onClick={() => {
+                setRoomInput(sim.homeId);
+                setShowSyncModal(true);
+              }}
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-black/25 backdrop-blur-xl border border-white/15 text-xs text-white/90 font-medium hover:bg-black/35 active:scale-95 transition"
+              title="Click to view Multi-Device Cloud Sync settings & link"
+            >
+              <span className={`w-2 h-2 rounded-full ${
+                sim.syncStatus === 'connected'
+                  ? 'bg-[#34c759] animate-pulse'
+                  : sim.syncStatus === 'connecting'
+                  ? 'bg-amber-400 animate-ping'
+                  : 'bg-red-400'
+              }`}></span>
+              <span className="hidden md:inline">
+                {sim.syncStatus === 'connected' ? 'Cloud Sync' : sim.syncStatus === 'connecting' ? 'Connecting...' : 'Sync Offline'}
+              </span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70 font-mono">
+                {sim.homeId}
+              </span>
+            </button>
+
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/25 backdrop-blur-xl border border-white/15 text-xs text-white/90 font-medium">
               <span className={`w-2 h-2 rounded-full ${
                 powerState === 'Online'
@@ -77,6 +124,99 @@ export default function App() {
             </button>
           </div>
         </header>
+
+        {/* ═══════════ MULTI-DEVICE CLOUD SYNC MODAL ═══════════ */}
+        {showSyncModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+            <div className="apple-squircle bg-slate-900/90 border border-white/20 p-5 sm:p-6 max-w-md w-full shadow-2xl text-white space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-full bg-[#007aff]/20 text-[#007aff] flex items-center justify-center border border-[#007aff]/30">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242M12 12v9m-4-4 4 4 4-4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-white">Smart Home Cloud Sync</h3>
+                    <p className="text-xs text-white/60">Live multi-device real-time control</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowSyncModal(false)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-xs text-white/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-white">Hub Connection:</span>
+                  <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                    sim.syncStatus === 'connected' ? 'bg-green-500/20 text-green-300 border border-green-500/40' : 'bg-amber-500/20 text-amber-300'
+                  }`}>
+                    {sim.syncStatus === 'connected' ? '● ONLINE (MQTT WSS)' : 'CONNECTING...'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-white/70 leading-relaxed">
+                  Open this dashboard on multiple devices (phone, laptop, tablet, or examiner's device).
+                  Any button clicked or slider moved on one device will <strong>instantly take action on all other screens</strong>.
+                </p>
+              </div>
+
+              {/* QR Code for Phone Scanning */}
+              <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                <span className="text-[11px] font-semibold text-white/80">Scan with your Phone Camera:</span>
+                <div className="p-2 bg-white rounded-xl shadow-md">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(shareUrl)}`}
+                    alt="Scan to open on phone"
+                    className="w-32 h-32"
+                  />
+                </div>
+              </div>
+
+              {/* Share / Copy Link Box */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-white/80">Shareable Room Link:</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={shareUrl}
+                    className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs text-white/90 font-mono focus:outline-none"
+                  />
+                  <button
+                    onClick={handleCopyLink}
+                    className="px-3.5 py-2 rounded-xl bg-[#007aff] hover:bg-[#007aff]/80 font-bold text-xs text-white shrink-0 active:scale-95 transition"
+                  >
+                    {copiedLink ? '✓ Copied' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Change Home ID form */}
+              <form onSubmit={handleRoomSubmit} className="pt-1 border-t border-white/10 space-y-2">
+                <label className="text-xs font-semibold text-white/80">Change Home Network Code:</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={roomInput}
+                    onChange={(e) => setRoomInput(e.target.value)}
+                    placeholder="e.g. ent600-home"
+                    className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-[#007aff]"
+                  />
+                  <button
+                    type="submit"
+                    className="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 font-semibold text-xs text-white shrink-0 active:scale-95 transition"
+                  >
+                    Switch
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Emergency Stop Alert Banner */}
         {state.emergencyStop && (

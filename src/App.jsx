@@ -51,8 +51,10 @@ export default function App() {
   }, []);
 
   return (
-    <div className="apple-home-bg min-h-screen text-white antialiased">
-      <div className="max-w-[1400px] mx-auto px-3 sm:px-8 py-4 sm:py-6 space-y-6">
+    <div className="relative min-h-screen text-white antialiased overflow-x-hidden">
+      {/* Static GPU-Accelerated Background Underlay for Tablet & Mobile (Zero Scroll Gaps) */}
+      <div className="apple-home-bg-underlay" aria-hidden="true" />
+      <div className="relative z-10 max-w-[1400px] mx-auto px-3 sm:px-8 py-4 sm:py-6 space-y-6">
         
         {/* ═══════════ APPLE HOME TOP BAR ═══════════ */}
         <header className="flex items-center justify-between pt-1 pb-2">

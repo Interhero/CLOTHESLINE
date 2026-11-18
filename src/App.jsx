@@ -237,6 +237,44 @@ export default function App() {
           </div>
         )}
 
+        {/* ═══════════ RAIN SAFETY CONFIRMATION WARNING MODAL ═══════════ */}
+        {sim.rainWarningNotice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn">
+            <div className="apple-squircle bg-slate-900/95 border border-[#ff9500]/50 p-5 sm:p-6 max-w-md w-full shadow-2xl text-white space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-[#ff9500]/20 text-[#ff9500] flex items-center justify-center border border-[#ff9500]/40 shrink-0">
+                  <CloudRain size={26} className="text-[#ff9500] animate-bounce" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-white">{sim.rainWarningNotice.title}</h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#ff9500]/20 text-[#ffaa33] border border-[#ff9500]/30">
+                    25% SAFE CANOPY LIMIT
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-xs text-white/80 space-y-2">
+                <p className="text-xs text-white/90 leading-relaxed">
+                  {sim.rainWarningNotice.message}
+                </p>
+                <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[11px] text-white/60">
+                  <span>Shelter Zone: 0% – 25% (Under Roof)</span>
+                  <span className="text-red-400 font-semibold">26% – 100% Rain Lockout</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  onClick={sim.dismissRainWarning}
+                  className="w-full py-2.5 rounded-xl bg-[#ff9500] hover:bg-[#ffaa33] text-slate-950 font-bold text-xs shadow-lg shadow-[#ff9500]/25 active:scale-95 transition"
+                >
+                  Understood & Maintain 25% Rain-Safe Limit
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ═══════════ MAIN 2-COLUMN APPLE HOME GRID ═══════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
           
@@ -394,11 +432,21 @@ export default function App() {
                   </span>
                 </div>
 
+                {/* Rain Lockout Banner if raining */}
+                {state.rainDetected && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#ff9500]/15 border border-[#ff9500]/30 text-[#ffaa33]">
+                    <span className="text-sm">🌧</span>
+                    <span className="font-semibold text-[11px] leading-tight">
+                      Rain Active: Extension capped at 25% safe shelter limit (10.0 cm).
+                    </span>
+                  </div>
+                )}
+
                 <div className="py-1">
                   <input
                     type="range"
                     min="0"
-                    max="100"
+                    max={state.rainDetected ? 25 : 100}
                     value={state.rodPositionPercent}
                     onChange={(e) => sim.setRodTarget(Number(e.target.value))}
                     disabled={!state.systemPower || state.emergencyStop}
@@ -414,13 +462,17 @@ export default function App() {
                     { label: 'Full 100%', val: 100 }
                   ].map((btn) => {
                     const isActive = Math.abs(state.rodPositionPercent - btn.val) <= 2;
+                    const isExceedingRainSafe = state.rainDetected && btn.val > 25;
                     return (
                       <button
                         key={btn.val}
                         onClick={() => sim.setRodTarget(btn.val)}
                         disabled={!state.systemPower || state.emergencyStop}
+                        title={isExceedingRainSafe ? 'Rain lockout: Cannot extend past 25%' : ''}
                         className={`py-2 px-1 rounded-full text-xs font-semibold transition-all duration-200 active:scale-95 disabled:opacity-40 border ${
-                          isActive
+                          isExceedingRainSafe
+                            ? 'bg-red-500/10 text-red-300 border-red-500/25 opacity-60'
+                            : isActive
                             ? btn.isShelter
                               ? 'bg-[#ff9500] text-slate-950 border-[#ff9500] shadow-md shadow-[#ff9500]/25'
                               : 'bg-white text-slate-950 border-white shadow-md'

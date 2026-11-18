@@ -49,6 +49,9 @@ export default function useSimulation() {
   const [homeId, setHomeIdState] = useState(getInitialHomeId);
   const [syncStatus, setSyncStatus] = useState('connecting'); // connecting | connected | offline
 
+  // Active confirmation warning for rain safe-limit violations
+  const [rainWarningNotice, setRainWarningNotice] = useState(null);
+
   const alertIdRef = useRef(0);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -71,6 +74,10 @@ export default function useSimulation() {
 
   const clearAlerts = useCallback(() => setAlerts([]), []);
 
+  const dismissRainWarning = useCallback(() => {
+    setRainWarningNotice(null);
+  }, []);
+
   // ─── rod animation ─────────────────────────────────
   const animateRod = useCallback((targetPercent) => {
     setState(prev => {
@@ -79,7 +86,12 @@ export default function useSimulation() {
         addAlert('critical', 'Laundry load exceeds the recommended simulation limit.');
         return { ...prev, motorStatus: 'Fault' };
       }
-      return { ...prev, rodTargetPercent: targetPercent, motorStatus: 'Moving' };
+      // If rain is active, hard-clamp rod target to shelteredPositionPercent (25%)
+      let effectiveTarget = targetPercent;
+      if (prev.rainDetected && targetPercent > prev.shelteredPositionPercent) {
+        effectiveTarget = prev.shelteredPositionPercent;
+      }
+      return { ...prev, rodTargetPercent: effectiveTarget, motorStatus: 'Moving' };
     });
   }, [addAlert]);
 
@@ -167,7 +179,25 @@ export default function useSimulation() {
   }, [addAlert]);
 
   const execSetRodTarget = useCallback((pct, isRemote = false) => {
-    if (pct <= 5) {
+    let target = pct;
+
+    // Rain Safety Lockout Check: Cannot extend past 25% sheltered position during rain
+    if (stateRef.current.rainDetected && pct > stateRef.current.shelteredPositionPercent) {
+      target = stateRef.current.shelteredPositionPercent;
+      if (!isRemote) {
+        addAlert('critical', '🌧 Rain Lockout: Cannot extend past 25% rain-safe limit while raining!');
+        setRainWarningNotice({
+          show: true,
+          type: 'slider',
+          requestedPercent: Math.round(pct),
+          safeLimit: stateRef.current.shelteredPositionPercent,
+          title: 'Rain Warning: Safe Limit Enforced',
+          message: `Outdoor rain is currently detected! The rack cannot extend past the ${stateRef.current.shelteredPositionPercent}% rain-safe shelter zone (10 cm) to protect your clothes from getting wet.`
+        });
+      }
+    }
+
+    if (target <= 5) {
       setState(prev => {
         if (prev.fanSpeed > 0) {
           addAlert('info', 'Rack folded against wall: Fan automatically shut off.');
@@ -176,18 +206,19 @@ export default function useSimulation() {
         return prev;
       });
     }
+
     if (!isRemote) {
       lastLocalInputTimeRef.current = Date.now();
-      iotSyncRef.current?.publishAction('SET_ROD_TARGET', { percent: pct });
+      iotSyncRef.current?.publishAction('SET_ROD_TARGET', { percent: target });
       iotSyncRef.current?.broadcastState({
         ...stateRef.current,
-        rodTargetPercent: pct,
+        rodTargetPercent: target,
         motorStatus: 'Moving'
       });
     } else {
-      addAlert('info', `📱 Remote: Rack stroke adjusted to ${Math.round(pct)}%.`);
+      addAlert('info', `📱 Remote: Rack stroke adjusted to ${Math.round(target)}%.`);
     }
-    animateRod(pct);
+    animateRod(target);
   }, [animateRod, addAlert]);
 
   const execSetPowerStateDemo = useCallback((targetState, isRemote = false) => {
@@ -215,11 +246,12 @@ export default function useSimulation() {
     } else if (targetState === 'Online') {
       setState(prev => {
         const nextPos = prev.rodPositionPercent <= 5 ? 75 : prev.rodPositionPercent;
+        const effectivePos = prev.rainDetected ? Math.min(prev.shelteredPositionPercent, nextPos) : nextPos;
         const next = {
           ...prev,
           systemPower: true,
-          rodPositionPercent: nextPos,
-          rodTargetPercent: nextPos,
+          rodPositionPercent: effectivePos,
+          rodTargetPercent: effectivePos,
           fanSpeed: 2,
           timerRunning: true,
           motorStatus: 'Idle'
@@ -281,6 +313,36 @@ export default function useSimulation() {
     setState(prev => {
       if (!prev.systemPower) return prev;
       const targetLoad = mode.loadKg ?? prev.laundryLoadKg;
+
+      // Rain Safety Check: If it rains, drying modes must operate within 25% safe limit with confirmation warning!
+      let targetStroke = mode.rod;
+      if (prev.rainDetected && mode.rod > prev.shelteredPositionPercent) {
+        targetStroke = prev.shelteredPositionPercent;
+        if (!isRemote) {
+          addAlert('high', `🌧 Rain Reminder: ${modeName} operating in sheltered position (25% rain-safe limit).`);
+          setRainWarningNotice({
+            show: true,
+            type: 'mode',
+            modeName,
+            safeLimit: prev.shelteredPositionPercent,
+            title: `Rain Reminder: ${modeName} in Safe Position`,
+            message: `Outdoor rain is currently detected! The "${modeName}" cycle has automatically locked to the ${prev.shelteredPositionPercent}% rain-safe shelter position under the roof so your laundry stays completely dry.`
+          });
+        }
+      } else {
+        if (!isRemote) {
+          if (modeName === 'Heavy Laundry') {
+            addAlert('info', `Scene set: Heavy Laundry. Load sensor updated to ${targetLoad} kg (92% load).`);
+          } else {
+            addAlert('info', `Mode activated: ${modeName} (${targetLoad} kg load).`);
+          }
+        }
+      }
+
+      if (isRemote) {
+        addAlert('info', `📱 Remote: Scene changed to ${modeName}.`);
+      }
+
       const nextState = {
         ...prev,
         selectedMode: modeName,
@@ -290,20 +352,14 @@ export default function useSimulation() {
         dryingProgressPercent: 0,
         timerRunning: true,
         laundryLoadKg: targetLoad,
-        rodTargetPercent: mode.rod,
+        rodTargetPercent: targetStroke,
         motorStatus: 'Moving'
       };
+
       if (!isRemote) {
         lastLocalInputTimeRef.current = Date.now();
-        if (modeName === 'Heavy Laundry') {
-          addAlert('info', `Scene set: Heavy Laundry. Load sensor updated to ${targetLoad} kg (92% load).`);
-        } else {
-          addAlert('info', `Mode activated: ${modeName} (${targetLoad} kg load).`);
-        }
         iotSyncRef.current?.publishAction('SELECT_MODE', { modeName });
         iotSyncRef.current?.broadcastState(nextState);
-      } else {
-        addAlert('info', `📱 Remote: Scene changed to ${modeName}.`);
       }
       return nextState;
     });
@@ -326,7 +382,7 @@ export default function useSimulation() {
   const execSimulateRain = useCallback((on, isRemote = false) => {
     setState(prev => {
       if (on && !prev.rainDetected) {
-        addAlert('high', isRemote ? '🌧 Remote: Rain detected! Retracting to shelter.' : 'Rain detected. Retracting clothes under the roof.');
+        addAlert('high', isRemote ? '🌧 Remote: Rain detected! Retracting to shelter.' : 'Rain detected! Auto-retracting rack to 25% rain-safe shelter.');
         const next = { ...prev, rainDetected: true };
         if (prev.autoRainProtection && prev.systemPower) {
           next.rodTargetPercent = prev.shelteredPositionPercent;
@@ -340,7 +396,7 @@ export default function useSimulation() {
         return next;
       }
       if (!on && prev.rainDetected) {
-        addAlert('info', isRemote ? '☀️ Remote: Rain cleared.' : 'Rain stopped. Dry weather resumed.');
+        addAlert('info', isRemote ? '☀️ Remote: Rain cleared.' : 'Rain stopped. Dry outdoor weather resumed.');
         const next = { ...prev, rainDetected: false };
         if (!isRemote) {
           lastLocalInputTimeRef.current = Date.now();
@@ -379,6 +435,7 @@ export default function useSimulation() {
   const execResetDemo = useCallback((isRemote = false) => {
     setState({ ...INITIAL_STATE });
     setAlerts([]);
+    setRainWarningNotice(null);
     if (!isRemote) {
       lastLocalInputTimeRef.current = Date.now();
       addAlert('info', 'Demo reset to initial state.');
@@ -395,7 +452,6 @@ export default function useSimulation() {
       const { type, payload } = action;
 
       if (type === 'PEER_REQUESTED_STATE') {
-        // Only broadcast if this device had user input within last 2 minutes
         const timeSinceInput = Date.now() - lastLocalInputTimeRef.current;
         if (timeSinceInput < 120000) {
           iotSyncRef.current?.broadcastState(stateRef.current);
@@ -441,7 +497,6 @@ export default function useSimulation() {
 
     const handleStateSnapshot = (incomingState) => {
       if (!incomingState) return;
-      // Guard: If THIS device had user input within the last 2.5 seconds, do NOT override with incoming snapshot!
       const timeSinceInput = Date.now() - lastLocalInputTimeRef.current;
       if (timeSinceInput < 2500) {
         return;
@@ -532,9 +587,8 @@ export default function useSimulation() {
   useEffect(() => {
     const syncInterval = setInterval(() => {
       const timeSinceInput = Date.now() - lastLocalInputTimeRef.current;
-      const isDeviceActiveWithInput = timeSinceInput < 45000; // active within last 45s
+      const isDeviceActiveWithInput = timeSinceInput < 45000;
 
-      // ONLY broadcast if this device was the one receiving input and a cycle or movement is running
       if (
         iotSyncRef.current &&
         syncStatus === 'connected' &&
@@ -554,6 +608,9 @@ export default function useSimulation() {
     homeId,
     setHomeId,
     syncStatus,
+    // rain warning
+    rainWarningNotice,
+    dismissRainWarning,
     // controls
     togglePower: () => execTogglePower(false),
     setFanSpeed: (s) => execSetFanSpeed(s, false),

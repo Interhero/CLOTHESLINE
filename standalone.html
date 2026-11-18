@@ -288,6 +288,7 @@
       const [showSyncModal, setShowSyncModal] = useState(false);
       const [copiedLink, setCopiedLink] = useState(false);
       const [roomInput, setRoomInput] = useState(homeId);
+      const [rainWarningNotice, setRainWarningNotice] = useState(null);
       const iotClientRef = useRef(null);
       const lastLocalInputTimeRef = useRef(0);
 
@@ -631,10 +632,36 @@
         });
       };
 
+      const handleSetRodTarget = (val) => {
+        let target = val;
+        if (rainDetected && val > shelteredPositionPercent) {
+          target = shelteredPositionPercent;
+          addAlert('critical', '🌧 Rain Lockout: Cannot extend past 25% rain-safe limit while raining!');
+          setRainWarningNotice({
+            show: true,
+            title: 'Rain Warning: Safe Limit Enforced',
+            message: `Outdoor rain is currently detected! The rack cannot extend past the ${shelteredPositionPercent}% rain-safe shelter zone (10 cm) to protect your clothes from getting wet.`
+          });
+        }
+        publishAction('SET_ROD_TARGET', { percent: target });
+        setRodTargetPercent(target);
+      };
+
       const handleOpen = () => {
         if (!systemPower || emergencyStop) return;
         if (laundryLoadKg > 5.0) {
           addAlert('critical', 'Overload protection: Cannot extend while overloaded.');
+          return;
+        }
+        if (rainDetected) {
+          addAlert('critical', '🌧 Rain Lockout: Cannot extend past 25% safe shelter limit while raining!');
+          setRainWarningNotice({
+            show: true,
+            title: 'Rain Warning: Safe Limit Enforced',
+            message: `Outdoor rain is currently detected! The rack cannot extend past the ${shelteredPositionPercent}% rain-safe shelter zone (10 cm) to protect your clothes from getting wet.`
+          });
+          publishAction('SET_ROD_TARGET', { percent: shelteredPositionPercent });
+          setRodTargetPercent(shelteredPositionPercent);
           return;
         }
         addAlert('info', 'Opening rack to 100% extended stroke.');
@@ -671,7 +698,22 @@
         const cfg = MODES[modeName];
         setSelectedMode(modeName);
         setFanSpeed(cfg.fan);
-        setRodTargetPercent(cfg.rod);
+
+        let targetStroke = cfg.rod;
+        if (rainDetected && cfg.rod > shelteredPositionPercent) {
+          targetStroke = shelteredPositionPercent;
+          if (!isRemote) {
+            addAlert('high', `🌧 Rain Reminder: ${modeName} operating in sheltered position (25% rain-safe limit).`);
+            setRainWarningNotice({
+              show: true,
+              modeName,
+              title: `Rain Reminder: ${modeName} in Safe Position`,
+              message: `Outdoor rain is currently detected! The "${modeName}" cycle has automatically locked to the ${shelteredPositionPercent}% rain-safe shelter position under the roof so your laundry stays completely dry.`
+            });
+          }
+        }
+
+        setRodTargetPercent(targetStroke);
         setRemainingMinutes(cfg.timer);
         setTotalMinutes(cfg.timer);
         setDryingProgressPercent(10);
@@ -683,7 +725,7 @@
           publishAction('SELECT_MODE', { modeName });
           if (modeName === 'Heavy Laundry') {
             addAlert('info', `Scene set: Heavy Laundry. Load sensor updated to ${cfg.loadKg} kg (92% load).`);
-          } else {
+          } else if (!rainDetected) {
             addAlert('info', `Scene set: ${modeName} (${FAN_LABELS[cfg.fan]} Fan, ${cfg.timer}m).`);
           }
         } else {
@@ -957,15 +999,6 @@
               </div>
             </div>
           )}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-95 ${emergencyStop
-                  ? 'bg-[#ff3b30] text-white shadow-red-500/50 animate-pulse'
-                  : 'bg-black/30 backdrop-blur-xl text-white/90 border border-white/20 hover:bg-black/45'
-                  }`}
-              >
-                {emergencyStop ? 'E-STOPPED' : 'E-STOP'}
-              </button>
-            </div>
-          </header>
 
           {/* Emergency Stop Alert Banner */}
           {emergencyStop && (
@@ -983,6 +1016,44 @@
               >
                 Release
               </button>
+            </div>
+          )}
+
+          {/* ═══════════ RAIN SAFETY CONFIRMATION WARNING MODAL ═══════════ */}
+          {rainWarningNotice && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+              <div className="apple-squircle bg-slate-900/95 border border-[#ff9500]/50 p-5 sm:p-6 max-w-md w-full shadow-2xl text-white space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-[#ff9500]/20 text-[#ff9500] flex items-center justify-center border border-[#ff9500]/40 shrink-0 text-2xl">
+                    🌧
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-white">{rainWarningNotice.title}</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#ff9500]/20 text-[#ffaa33] border border-[#ff9500]/30">
+                      25% SAFE CANOPY LIMIT
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-xs text-white/80 space-y-2">
+                  <p className="text-xs text-white/90 leading-relaxed">
+                    {rainWarningNotice.message}
+                  </p>
+                  <div className="flex items-center justify-between pt-1 border-t border-white/10 text-[11px] text-white/60">
+                    <span>Shelter Zone: 0% – 25% (Under Roof)</span>
+                    <span className="text-red-400 font-semibold">26% – 100% Rain Lockout</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    onClick={() => setRainWarningNotice(null)}
+                    className="w-full py-2.5 rounded-xl bg-[#ff9500] hover:bg-[#ffaa33] text-slate-950 font-bold text-xs shadow-lg shadow-[#ff9500]/25 active:scale-95 transition"
+                  >
+                    Understood & Maintain 25% Rain-Safe Limit
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1468,14 +1539,24 @@
                     </span>
                   </div>
 
+                  {/* Rain Lockout Banner if raining */}
+                  {rainDetected && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#ff9500]/15 border border-[#ff9500]/30 text-[#ffaa33]">
+                      <span className="text-sm">🌧</span>
+                      <span className="font-semibold text-[11px] leading-tight">
+                        Rain Active: Extension capped at 25% safe shelter limit (10.0 cm).
+                      </span>
+                    </div>
+                  )}
+
                   {/* Clean Slider Track */}
                   <div className="py-1">
                     <input
                       type="range"
                       min="0"
-                      max="100"
+                      max={rainDetected ? 25 : 100}
                       value={rodPositionPercent}
-                      onChange={(e) => setRodTargetPercent(Number(e.target.value))}
+                      onChange={(e) => handleSetRodTarget(Number(e.target.value))}
                       disabled={!systemPower || emergencyStop}
                       className="w-full accent-white cursor-pointer h-2.5 bg-white/20 rounded-full appearance-none disabled:opacity-40 transition-all hover:bg-white/25"
                     />
@@ -1490,19 +1571,24 @@
                       { label: 'Full 100%', val: 100 }
                     ].map((btn) => {
                       const isActive = Math.abs(rodPositionPercent - btn.val) <= 2;
+                      const isExceedingRainSafe = rainDetected && btn.val > 25;
                       return (
                         <button
                           key={btn.val}
-                          onClick={() => setRodTargetPercent(btn.val)}
+                          onClick={() => handleSetRodTarget(btn.val)}
                           disabled={!systemPower || emergencyStop}
-                          className={`py-2 px-1 rounded-full text-xs font-semibold transition-all duration-200 active:scale-95 disabled:opacity-40 border ${isActive
-                            ? btn.isShelter
-                              ? 'bg-[#ff9500] text-slate-950 border-[#ff9500] shadow-md shadow-[#ff9500]/25'
-                              : 'bg-white text-slate-950 border-white shadow-md'
-                            : btn.isShelter
+                          title={isExceedingRainSafe ? 'Rain lockout: Cannot extend past 25%' : ''}
+                          className={`py-2 px-1 rounded-full text-xs font-semibold transition-all duration-200 active:scale-95 disabled:opacity-40 border ${
+                            isExceedingRainSafe
+                              ? 'bg-red-500/10 text-red-300 border-red-500/25 opacity-60'
+                              : isActive
+                              ? btn.isShelter
+                                ? 'bg-[#ff9500] text-slate-950 border-[#ff9500] shadow-md shadow-[#ff9500]/25'
+                                : 'bg-white text-slate-950 border-white shadow-md'
+                              : btn.isShelter
                               ? 'bg-[#ff9500]/15 hover:bg-[#ff9500]/25 text-[#ffaa33] border-[#ff9500]/30'
                               : 'bg-white/10 hover:bg-white/20 text-white/90 border-white/10'
-                            }`}
+                          }`}
                         >
                           {btn.label}
                         </button>

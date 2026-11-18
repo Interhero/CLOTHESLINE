@@ -1,0 +1,1464 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>CLOTHESLINE SMART DRY — Apple Home Hub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap"
+    rel="stylesheet">
+
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Plus Jakarta Sans', sans-serif;
+      margin: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Apple Home Ambient Dynamic Wallpaper */
+    .apple-home-bg {
+      background: linear-gradient(170deg, #4b7ea8 0%, #6899c7 28%, #b38e78 65%, #d19a79 88%, #c58661 100%);
+      background-attachment: fixed;
+    }
+
+    /* Apple Frosted Glass */
+    .glass-tile-inactive {
+      background: rgba(18, 24, 38, 0.42);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.18);
+    }
+
+    .glass-tile-inactive:hover {
+      background: rgba(25, 34, 52, 0.52);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .glass-tile-active {
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(32px);
+      -webkit-backdrop-filter: blur(32px);
+      box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.22), 0 2px 8px -2px rgba(0, 0, 0, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.95);
+    }
+
+    /* Apple Home Squircle Radius */
+    .apple-squircle {
+      border-radius: 24px;
+    }
+
+    .apple-squircle-sm {
+      border-radius: 18px;
+    }
+
+    /* Fan spinning speeds */
+    @keyframes fan-spin {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .fan-low {
+      animation: fan-spin 2s linear infinite;
+    }
+
+    .fan-medium {
+      animation: fan-spin 0.9s linear infinite;
+    }
+
+    .fan-high {
+      animation: fan-spin 0.35s linear infinite;
+    }
+
+    /* Rain simulation */
+    @keyframes rain-fall {
+      0% {
+        transform: translateY(-10px);
+        opacity: 0;
+      }
+
+      20% {
+        opacity: 0.85;
+      }
+
+      100% {
+        transform: translateY(140px);
+        opacity: 0;
+      }
+    }
+
+    .rain-drop {
+      animation: rain-fall 0.75s linear infinite;
+    }
+
+    /* Fluid Cloth Sway Animations */
+    @keyframes cloth-idle {
+
+      0%,
+      100% {
+        transform: rotate(0deg);
+      }
+
+      50% {
+        transform: rotate(2deg);
+      }
+    }
+
+    @keyframes cloth-sway-low {
+
+      0%,
+      100% {
+        transform: rotate(-2.5deg);
+      }
+
+      50% {
+        transform: rotate(4.5deg);
+      }
+    }
+
+    @keyframes cloth-sway-med {
+
+      0%,
+      100% {
+        transform: rotate(-4deg);
+      }
+
+      50% {
+        transform: rotate(8deg);
+      }
+    }
+
+    @keyframes cloth-sway-high {
+
+      0%,
+      100% {
+        transform: rotate(-6deg);
+      }
+
+      50% {
+        transform: rotate(13deg);
+      }
+    }
+
+    .sway-idle {
+      animation: cloth-idle 3s ease-in-out infinite;
+      transform-origin: 0px 0px;
+    }
+
+    .sway-low {
+      animation: cloth-sway-low 1.8s ease-in-out infinite;
+      transform-origin: 0px 0px;
+    }
+
+    .sway-med {
+      animation: cloth-sway-med 1.1s ease-in-out infinite;
+      transform-origin: 0px 0px;
+    }
+
+    .sway-high {
+      animation: cloth-sway-high 0.75s ease-in-out infinite;
+      transform-origin: 0px 0px;
+    }
+
+    /* Wind breeze line dash flow */
+    @keyframes wind-flow {
+      from {
+        stroke-dashoffset: 28;
+      }
+
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
+
+    .wind-streaming {
+      animation: wind-flow 0.85s linear infinite;
+    }
+
+    .wind-streaming-fast {
+      animation: wind-flow 0.4s linear infinite;
+    }
+
+    /* Fluid Orange Icon breathing / wave animation */
+    @keyframes orange-fluid-wave {
+
+      0%,
+      100% {
+        transform: scale(1) rotate(0deg);
+        filter: drop-shadow(0 0 4px rgba(255, 149, 0, 0.4));
+      }
+
+      50% {
+        transform: scale(1.06) rotate(3deg);
+        filter: drop-shadow(0 0 10px rgba(255, 149, 0, 0.75));
+      }
+    }
+
+    .orange-fluid {
+      animation: orange-fluid-wave 2.2s ease-in-out infinite;
+      transform-origin: center;
+    }
+
+    /* Flowing rain safe boundary */
+    @keyframes dash-flow {
+      to {
+        stroke-dashoffset: -20;
+      }
+    }
+
+    .rain-safe-flowing {
+      animation: dash-flow 1.5s linear infinite;
+    }
+
+    /* Smooth transition */
+    .rod-animate {
+      transition: all 0.3s cubic-bezier(0.2, 0.8, 0.25, 1);
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 9999px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.5);
+    }
+  </style>
+</head>
+
+<body class="apple-home-bg min-h-screen text-white antialiased">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    const MODES = {
+      'Quick Dry': { fan: 3, rod: 100, timer: 90, loadKg: 2.4, desc: 'Maximum airflow for rapid drying', icon: 'zap', color: '#ff9500' },
+      'Delicate Fabrics': { fan: 1, rod: 100, timer: 120, loadKg: 1.5, desc: 'Gentle low-speed air for lighter items', icon: 'feather', color: '#af52de' },
+      'Heavy Laundry': { fan: 3, rod: 100, timer: 180, loadKg: 4.6, desc: 'Extended high-speed cycle for thick bedding', icon: 'layers', color: '#007aff' },
+      'Eco Air-Dry': { fan: 1, rod: 100, timer: 240, loadKg: 2.2, desc: 'Energy-saving air drying with lower noise', icon: 'leaf', color: '#34c759' },
+      'Night Silent': { fan: 1, rod: 100, timer: 120, loadKg: 1.8, desc: 'Whisper-quiet fan speed with muted alerts', icon: 'moon', color: '#5856d6' }
+    };
+
+    const FAN_LABELS = ['Off', 'Low', 'Med', 'High'];
+
+    function AppleHomeApp() {
+      // System States
+      const [systemPower, setSystemPower] = useState(true);
+      const [fanSpeed, setFanSpeed] = useState(2);
+      const [rodPositionPercent, setRodPositionPercent] = useState(75);
+      const [rodTargetPercent, setRodTargetPercent] = useState(75);
+      const [rainDetected, setRainDetected] = useState(false);
+      const [autoRainProtection, setAutoRainProtection] = useState(true);
+      const [shelteredPositionPercent, setShelteredPositionPercent] = useState(25);
+      const [temperatureF, setTemperatureF] = useState(68);
+      const [temperatureC, setTemperatureC] = useState(29.2);
+      const [humidityPercent, setHumidityPercent] = useState(68);
+      const [laundryLoadKg, setLaundryLoadKg] = useState(2.4);
+      const [dryingProgressPercent, setDryingProgressPercent] = useState(42);
+      const [remainingMinutes, setRemainingMinutes] = useState(58);
+      const [totalMinutes, setTotalMinutes] = useState(90);
+      const [selectedMode, setSelectedMode] = useState('Quick Dry');
+      const [motorStatus, setMotorStatus] = useState('Idle');
+      const [obstacleDetected, setObstacleDetected] = useState(false);
+      const [emergencyStop, setEmergencyStop] = useState(false);
+      const [timerRunning, setTimerRunning] = useState(true);
+      const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+
+      const [alerts, setAlerts] = useState([
+        { id: 1, level: 'info', text: 'Balcony Smart Rack online and responding.', time: '11:30 AM' },
+        { id: 2, level: 'info', text: 'All sensors calibrated. 3-rod mechanism ready.', time: '11:31 AM' }
+      ]);
+
+      const alertIdCounter = useRef(3);
+
+      const addAlert = useCallback((level, text) => {
+        const newAlert = {
+          id: alertIdCounter.current++,
+          level,
+          text,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setAlerts(prev => [newAlert, ...prev].slice(0, 30));
+      }, []);
+
+      // Clock
+      useEffect(() => {
+        const t = setInterval(() => {
+          setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        }, 1000);
+        return () => clearInterval(t);
+      }, []);
+
+      // Smooth 40Hz Motor Rod Engine
+      useEffect(() => {
+        const interval = setInterval(() => {
+          if (!systemPower) return;
+          if (emergencyStop || obstacleDetected) {
+            if (motorStatus === 'Moving') setMotorStatus('Stopped');
+            return;
+          }
+          if (laundryLoadKg > 5.0) {
+            if (motorStatus === 'Moving') {
+              setMotorStatus('Fault');
+              addAlert('critical', 'Load limit reached: exceeds 5.0 kg structural rating.');
+            }
+            return;
+          }
+
+          setRodPositionPercent(curr => {
+            const diff = rodTargetPercent - curr;
+            if (Math.abs(diff) <= 0.8) {
+              if (motorStatus === 'Moving') {
+                setMotorStatus('Idle');
+                if (curr === shelteredPositionPercent && rainDetected) {
+                  addAlert('high', 'Rack auto-sheltered under protective roof (25%).');
+                }
+              }
+              return rodTargetPercent;
+            }
+            setMotorStatus('Moving');
+            const step = Math.sign(diff) * Math.min(Math.abs(diff), 1.4);
+            return +(curr + step).toFixed(2);
+          });
+        }, 25);
+
+        return () => clearInterval(interval);
+      }, [rodTargetPercent, systemPower, emergencyStop, obstacleDetected, laundryLoadKg, motorStatus, rainDetected, shelteredPositionPercent, addAlert]);
+
+      // Telemetry Countdown Engine
+      useEffect(() => {
+        const interval = setInterval(() => {
+          if (!systemPower) return;
+
+          if (timerRunning && remainingMinutes > 0) {
+            setRemainingMinutes(prev => {
+              const next = Math.max(0, +(prev - 0.2).toFixed(1));
+              if (next === 0) {
+                setFanSpeed(0);
+                setTimerRunning(false);
+                addAlert('info', 'Drying cycle finished. Fan shut off.');
+              }
+              return next;
+            });
+
+            setDryingProgressPercent(prev => {
+              const humidityFactor = 1 - (humidityPercent - 50) / 200;
+              const speedMultiplier = fanSpeed === 0 ? 0.05 : (fanSpeed * 0.18);
+              return Math.min(100, +(prev + speedMultiplier * humidityFactor).toFixed(1));
+            });
+          }
+
+          // Gentle ambient drift
+          setTemperatureC(t => +(t + (Math.random() - 0.5) * 0.1).toFixed(1));
+          setTemperatureF(f => Math.round(68 + (Math.random() - 0.5) * 1.5));
+          setHumidityPercent(h => Math.min(98, Math.max(25, +(h + (Math.random() - 0.5) * 0.2).toFixed(0))));
+        }, 1000);
+
+        return () => clearInterval(interval);
+      }, [systemPower, timerRunning, remainingMinutes, fanSpeed, humidityPercent, addAlert]);
+
+      // Auto-Rain Watcher
+      useEffect(() => {
+        if (rainDetected && autoRainProtection && systemPower && !emergencyStop) {
+          addAlert('high', 'Rain detected! Retracting rack to 25% rain-safe shelter.');
+          setRodTargetPercent(shelteredPositionPercent);
+        }
+      }, [rainDetected, autoRainProtection, systemPower, emergencyStop, shelteredPositionPercent, addAlert]);
+
+      // Auto Turn-Off Fan When Rack Is Folded
+      useEffect(() => {
+        if (rodPositionPercent <= 5 && fanSpeed > 0) {
+          setFanSpeed(0);
+          addAlert('info', 'Rack folded against wall: Fan automatically shut off.');
+        }
+      }, [rodPositionPercent, fanSpeed, addAlert]);
+
+      // Handlers
+      const handlePowerToggle = () => {
+        setSystemPower(p => {
+          const next = !p;
+          addAlert('info', next ? 'Smart Rack powered on.' : 'Smart Rack turned off.');
+          if (!next) {
+            setFanSpeed(0);
+            setTimerRunning(false);
+            setMotorStatus('Idle');
+          }
+          return next;
+        });
+      };
+
+      const handleOpen = () => {
+        if (!systemPower || emergencyStop) return;
+        if (laundryLoadKg > 5.0) {
+          addAlert('critical', 'Overload protection: Cannot extend while overloaded.');
+          return;
+        }
+        addAlert('info', 'Opening rack to 100% extended stroke.');
+        setRodTargetPercent(100);
+      };
+
+      const handleFold = () => {
+        if (!systemPower || emergencyStop) return;
+        addAlert('info', 'Retracting rack completely to wall (0%). Fan automatically shut off.');
+        setFanSpeed(0);
+        setRodTargetPercent(0);
+      };
+
+      const handleEmergencyStop = () => {
+        setEmergencyStop(e => {
+          const next = !e;
+          if (next) {
+            addAlert('critical', 'Emergency Stop engaged! All motion locked.');
+            setMotorStatus('Stopped');
+            setTimerRunning(false);
+          } else {
+            addAlert('info', 'Emergency Stop released.');
+            setMotorStatus('Idle');
+          }
+          return next;
+        });
+      };
+
+      const handleSelectMode = (modeName) => {
+        if (!systemPower) return;
+        const cfg = MODES[modeName];
+        setSelectedMode(modeName);
+        setFanSpeed(cfg.fan);
+        setRodTargetPercent(cfg.rod);
+        setRemainingMinutes(cfg.timer);
+        setTotalMinutes(cfg.timer);
+        setDryingProgressPercent(10);
+        setTimerRunning(true);
+        if (cfg.loadKg !== undefined) {
+          setLaundryLoadKg(cfg.loadKg);
+        }
+        if (modeName === 'Heavy Laundry') {
+          addAlert('info', `Scene set: Heavy Laundry. Load sensor updated to ${cfg.loadKg} kg (92% load).`);
+        } else {
+          addAlert('info', `Scene set: ${modeName} (${FAN_LABELS[cfg.fan]} Fan, ${cfg.timer}m).`);
+        }
+      };
+
+      const handleSimulateRain = (isRain) => {
+        setRainDetected(isRain);
+        if (!isRain) addAlert('info', 'Rain cleared. Outdoor drying safe.');
+      };
+
+      const handleSimulateObstacle = (hasObstacle) => {
+        setObstacleDetected(hasObstacle);
+        if (hasObstacle) {
+          addAlert('critical', 'Obstacle detected! Motion locked for safety.');
+          setMotorStatus('Stopped');
+        } else {
+          addAlert('info', 'Obstacle cleared.');
+          setMotorStatus('Idle');
+        }
+      };
+
+      const handleResetDemo = () => {
+        setSystemPower(true);
+        setFanSpeed(2);
+        setRodPositionPercent(75);
+        setRodTargetPercent(75);
+        setRainDetected(false);
+        setAutoRainProtection(true);
+        setShelteredPositionPercent(25);
+        setTemperatureF(68);
+        setTemperatureC(29.2);
+        setHumidityPercent(68);
+        setLaundryLoadKg(2.4);
+        setDryingProgressPercent(42);
+        setRemainingMinutes(58);
+        setTotalMinutes(90);
+        setSelectedMode('Quick Dry');
+        setMotorStatus('Idle');
+        setObstacleDetected(false);
+        setEmergencyStop(false);
+        setTimerRunning(true);
+        addAlert('info', 'All accessories and scenes reset to defaults.');
+      };
+
+      // Derived 3-Tier System Power & Operational State
+      const powerState = !systemPower
+        ? 'Offline'
+        : (fanSpeed > 0 || timerRunning || motorStatus === 'Moving')
+          ? 'Online'
+          : 'Standby';
+
+      // Demo Scene Controller for FYP Presentation
+      const handleDemoPowerState = (targetState) => {
+        if (targetState === 'Standby') {
+          setSystemPower(true);
+          setFanSpeed(0);
+          setTimerRunning(false);
+          setMotorStatus('Idle');
+          addAlert('info', 'Scene Demo: System is in STANDBY (Connected & ready for commands).');
+        } else if (targetState === 'Online') {
+          setSystemPower(true);
+          if (rodPositionPercent <= 5) setRodTargetPercent(75);
+          setFanSpeed(2);
+          setTimerRunning(true);
+          addAlert('info', 'Scene Demo: System is ONLINE (Active drying cycle in progress).');
+        } else if (targetState === 'Offline') {
+          setSystemPower(false);
+          setFanSpeed(0);
+          setTimerRunning(false);
+          setMotorStatus('Idle');
+          addAlert('info', 'Scene Demo: System is OFFLINE (Power disconnected / idle shutdown).');
+        }
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col px-3 sm:px-8 py-4 sm:py-6 max-w-[1400px] mx-auto space-y-6">
+
+          {/* ═══════════ APPLE HOME TOP BAR ═══════════ */}
+          <header className="flex items-center justify-between pt-1 pb-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-sm">
+                  My Home
+                </span>
+                <svg className="w-5 h-5 text-white/70" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <p className="text-xs sm:text-sm text-white/80 font-medium">Balcony • Smart Drying Rack</p>
+            </div>
+
+            {/* Apple Home Action Pills */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/25 backdrop-blur-xl border border-white/15 text-xs text-white/90 font-medium">
+                <span className={`w-2 h-2 rounded-full ${powerState === 'Online' ? 'bg-[#00c7be] animate-ping' :
+                  powerState === 'Standby' ? 'bg-[#34c759] animate-pulse' : 'bg-slate-500'
+                  }`}></span>
+                <span>{currentTime} • {powerState}</span>
+              </div>
+
+              {rainDetected && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#007aff]/30 backdrop-blur-xl border border-[#007aff]/40 text-xs text-white font-semibold animate-pulse">
+                  <span>🌧 Rain</span>
+                </div>
+              )}
+
+              {/* Emergency Stop Button (Apple Style) */}
+              <button
+                onClick={handleEmergencyStop}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-95 ${emergencyStop
+                  ? 'bg-[#ff3b30] text-white shadow-red-500/50 animate-pulse'
+                  : 'bg-black/30 backdrop-blur-xl text-white/90 border border-white/20 hover:bg-black/45'
+                  }`}
+              >
+                {emergencyStop ? 'E-STOPPED' : 'E-STOP'}
+              </button>
+            </div>
+          </header>
+
+          {/* Emergency Stop Alert Banner */}
+          {emergencyStop && (
+            <div className="apple-squircle p-4 bg-[#ff3b30]/90 backdrop-blur-2xl text-white flex items-center justify-between shadow-2xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white text-[#ff3b30] flex items-center justify-center font-black text-lg">!</div>
+                <div>
+                  <h3 className="font-bold text-sm">Emergency Stop Triggered</h3>
+                  <p className="text-xs text-white/80">Motor cut off and rack safely locked in position.</p>
+                </div>
+              </div>
+              <button
+                onClick={handleEmergencyStop}
+                className="px-4 py-2 rounded-full bg-white text-[#ff3b30] font-bold text-xs shadow-md active:scale-95 transition"
+              >
+                Release
+              </button>
+            </div>
+          )}
+
+          {/* ═══════════ MAIN 2-COLUMN APPLE HOME GRID ═══════════ */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
+
+            {/* ────────────────── LEFT COLUMN: HERO RACK ACCESSORY & CONTROLS (7 COLS) ────────────────── */}
+            <div className="lg:col-span-7 space-y-5">
+
+              {/* SECTION 1: HERO ACCESSORY CARD (APPLE CAMERA / ACCESSORY PREVIEW) */}
+              <div>
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <div className="flex items-center gap-1.5 text-white/95 font-bold text-base sm:text-lg">
+                    <span>Laundry Balcony</span>
+                    <svg className="w-4 h-4 text-white/60" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <span className="text-xs font-semibold text-white/80 bg-black/25 backdrop-blur-xl px-2.5 py-1 rounded-full border border-white/10">
+                    Live Accessory
+                  </span>
+                </div>
+
+                {/* Hero Accessory Preview Box */}
+                <div className="apple-squircle glass-tile-inactive p-4 sm:p-5 relative overflow-hidden">
+
+                  {/* Rain Overlay Layer */}
+                  {rainDetected && (
+                    <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden">
+                      {[...Array(26)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="rain-drop absolute w-0.5 bg-cyan-200/90 rounded-full"
+                          style={{
+                            left: `${(i * 3.9) % 96}%`,
+                            top: `-15px`,
+                            height: `${14 + (i % 4) * 4}px`,
+                            animationDelay: `${(i * 0.06)}s`
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Top Status Badges inside the Card */}
+                  <div className="flex items-center justify-between mb-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2.5 h-2.5 rounded-full ${motorStatus === 'Moving' ? 'bg-[#007aff] animate-ping' :
+                        motorStatus === 'Fault' || motorStatus === 'Stopped' ? 'bg-[#ff3b30]' : 'bg-[#34c759]'
+                        }`}></span>
+                      <span className="font-semibold text-white/90">Motor: {motorStatus}</span>
+                      <span className="text-white/40">•</span>
+                      <span className="text-white/80 font-medium">Mode: {selectedMode}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 font-mono text-xs bg-black/40 px-2.5 py-0.5 rounded-full text-white/90 border border-white/10">
+                      <span>Stroke:</span>
+                      <strong className="text-[#32ade6]">{Math.round(rodPositionPercent)}%</strong>
+                    </div>
+                  </div>
+
+                  {/* The SVG Visualizer with Top Blower & Fluid Swaying Clothes */}
+                  <div className="py-2">
+                    <svg viewBox="0 0 540 230" className="w-full h-auto select-none rounded-2xl bg-black/40 border border-white/10" style={{ maxHeight: '250px' }}>
+                      <defs>
+                        <linearGradient id="wallGrad" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#2c3444" />
+                          <stop offset="100%" stopColor="#3d495c" />
+                        </linearGradient>
+                        <linearGradient id="rodGrad" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#007aff" />
+                          <stop offset="100%" stopColor="#5ac8fa" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Roof / Sheltered Zone */}
+                      <rect x="0" y="0" width="165" height="230" fill="rgba(0, 0, 0, 0.35)" />
+                      <rect x="0" y="0" width="165" height="230" fill="none" stroke="rgba(255, 255, 255, 0.15)" strokeWidth="1" strokeDasharray="4 4" />
+
+                      <text x="82.5" y="24" fill="rgba(255, 255, 255, 0.6)" fontSize="9" fontWeight="700" textAnchor="middle" letterSpacing="0.8">
+                        SHELTERED
+                      </text>
+
+                      {/* 25% Rain-safe Boundary */}
+                      <line
+                        x1="165"
+                        y1="48"
+                        x2="165"
+                        y2="220"
+                        stroke="#ff9500"
+                        strokeWidth="1.5"
+                        strokeDasharray="4 3"
+                        className={rainDetected ? 'rain-safe-flowing' : ''}
+                        opacity={rodPositionPercent <= 25 ? '1' : '0.6'}
+                        style={{ transition: 'opacity 0.3s ease-out' }}
+                      />
+                      <text
+                        x="165"
+                        y="44"
+                        fill="#ff9500"
+                        fontSize="8"
+                        fontWeight="800"
+                        textAnchor="middle"
+                        opacity={rodPositionPercent <= 25 ? '1' : '0.8'}
+                        style={{ transition: 'opacity 0.3s ease-out' }}
+                      >
+                        25% RAIN-SAFE
+                      </text>
+                      {rodPositionPercent <= 25 && (
+                        <circle cx="165" cy="48" r="2.5" fill="#ff9500" className="animate-ping" opacity="0.8" />
+                      )}
+
+                      {/* ─── MAIN UNIT WITH INTEGRATED FAN & SMART DRY LABELS ─── */}
+                      <g>
+                        {/* Main Wall Mount Unit Housing */}
+                        <rect x="15" y="38" width="45" height="162" rx="10" fill="url(#wallGrad)" stroke="rgba(255, 255, 255, 0.2)" strokeWidth="1.5" />
+
+                        {/* "SMART" Label */}
+                        <rect x="21" y="45" width="33" height="12" rx="3.5" fill="#0f172a" />
+                        <text x="37.5" y="54" fill="#5ac8fa" fontSize="7.5" fontWeight="800" textAnchor="middle">SMART</text>
+
+                        {/* ─── HIGH-TECH SPINNING FAN TURBINE IN MAIN UNIT (BETWEEN SMART & DRY) ─── */}
+                        <g transform="translate(37.5, 78)">
+                          {/* Circular Fan Vent Housing */}
+                          <circle r="15" fill="#0b1322" stroke="#00c7be" strokeWidth="1.6" />
+                          <circle r="12" fill="#141e33" stroke="rgba(255,255,255,0.15)" strokeWidth="0.8" />
+
+                          {/* Spinning Fan Impeller */}
+                          <g className={fanSpeed > 0 ? (fanSpeed === 1 ? 'fan-low' : fanSpeed === 2 ? 'fan-medium' : 'fan-high') : ''} style={{ transformOrigin: '0px 0px' }}>
+                            <circle cx="0" cy="0" r="2.8" fill="#ffffff" />
+                            <path d="M0,-2.5 V-10.5 a2.2,2.2 0 0 1 4.4,0 c0,3.2 -2.5,5.8 -4.4,5.8 z" fill="#5ac8fa" />
+                            <path d="M2.5,0 H10.5 a2.2,2.2 0 0 1 0,4.4 c-3.2,0 -5.8,-2.5 -5.8,-4.4 z" fill="#5ac8fa" />
+                            <path d="M0,2.5 V10.5 a2.2,2.2 0 0 1 -4.4,0 c0,-3.2 2.5,-5.8 4.4,-5.8 z" fill="#5ac8fa" />
+                            <path d="M-2.5,0 H-10.5 a2.2,2.2 0 0 1 0,-4.4 c3.2,0 5.8,2.5 5.8,4.4 z" fill="#5ac8fa" />
+                          </g>
+                          {/* Airflow outlet grille louvers on right edge */}
+                          <line x1="13" y1="-6" x2="15" y2="-6" stroke="#00c7be" strokeWidth="1.5" strokeLinecap="round" />
+                          <line x1="14" y1="0" x2="16" y2="0" stroke="#00c7be" strokeWidth="1.5" strokeLinecap="round" />
+                          <line x1="13" y1="6" x2="15" y2="6" stroke="#00c7be" strokeWidth="1.5" strokeLinecap="round" />
+                        </g>
+
+                        {/* "DRY" Label */}
+                        <rect x="21" y="99" width="33" height="12" rx="3.5" fill="#0f172a" />
+                        <text x="37.5" y="108" fill="#5ac8fa" fontSize="7.5" fontWeight="800" textAnchor="middle">DRY</text>
+
+                        {/* Power Status LED (Dynamic: Standby / Online / Offline) */}
+                        <circle
+                          cx="37.5"
+                          cy="123"
+                          r="4"
+                          fill={powerState === 'Online' ? '#00c7be' : powerState === 'Standby' ? '#34c759' : '#64748b'}
+                        />
+                        <text x="37.5" y="136" fill="rgba(255,255,255,0.75)" fontSize="6" fontWeight="700" textAnchor="middle">
+                          {powerState.toUpperCase()}
+                        </text>
+
+                        {/* Motor Gear Unit */}
+                        <g transform="translate(37.5, 166)">
+                          <circle r="12" fill="#0f172a" stroke="rgba(255,255,255,0.2)" strokeWidth="1.2" />
+                          <text x="0" y="3" fill="rgba(255,255,255,0.7)" fontSize="6.5" fontWeight="700" textAnchor="middle">MOTOR</text>
+                        </g>
+                      </g>
+
+                      {/* 3 Motorized Retractable Rods */}
+                      {[0, 1, 2].map((idx) => {
+                        const y = 80 + idx * 42;
+                        const rodWidth = (rodPositionPercent / 100) * 330;
+                        const rodEnd = 60 + rodWidth;
+                        const swayClass = fanSpeed === 0 ? 'sway-idle' : fanSpeed === 1 ? 'sway-low' : fanSpeed === 2 ? 'sway-med' : 'sway-high';
+
+                        return (
+                          <g key={idx}>
+                            <path
+                              d={`M60,${y} L${60 + rodWidth * 0.5},${y - 8} L${rodEnd},${y} L${60 + rodWidth * 0.5},${y + 8} Z`}
+                              fill="none"
+                              stroke="rgba(255, 255, 255, 0.15)"
+                              strokeWidth="1.2"
+                              opacity={rodPositionPercent > 10 ? 0.8 : 0.2}
+                              className="rod-animate"
+                            />
+                            <line
+                              x1="60"
+                              y1={y}
+                              x2={rodEnd}
+                              y2={y}
+                              stroke="url(#rodGrad)"
+                              strokeWidth="6"
+                              strokeLinecap="round"
+                              className="rod-animate"
+                            />
+                            <circle
+                              cx={rodEnd}
+                              cy={y}
+                              r="5"
+                              fill="#5ac8fa"
+                              stroke="#ffffff"
+                              strokeWidth="1.5"
+                              className="rod-animate"
+                            />
+
+                            {/* Percentage Indicator on Top Rod */}
+                            {idx === 0 && (
+                              <text
+                                x={rodEnd + 14}
+                                y={y + 4}
+                                fill="#ffffff"
+                                fontSize="12"
+                                fontWeight="800"
+                                fontFamily="SF Pro Display, -apple-system, sans-serif"
+                                className="rod-animate select-none"
+                              >
+                                {Math.round(rodPositionPercent)}%
+                              </text>
+                            )}
+
+                            {/* ─── REALISTIC HANGING LAUNDRY ON RODS (NATURALLY STAGGERED & PROPERLY ANCHORED) ─── */}
+                            {laundryLoadKg > 0 && rodPositionPercent > 5 && (
+                              <g>
+                                {/* TOP ROD: Cyan T-Shirt & Vibrant Orange Folded Towel */}
+                                {idx === 0 && (
+                                  <>
+                                    {/* Item A: Cyan T-Shirt */}
+                                    <g
+                                      transform={`translate(${60 + rodWidth * 0.38}, ${y})`}
+                                      style={{ opacity: Math.max(0, Math.min(0.95, (rodPositionPercent - 10) / 20)), transition: 'opacity 0.3s ease-out' }}
+                                    >
+                                      <g className={swayClass} style={{ transformOrigin: '0px 0px' }}>
+                                        {/* Wire hanger hook */}
+                                        <path d="M0,0 Q-2,-4 0,-7 Q3,-9 6,-6 Q7,-3 2,-1" fill="none" stroke="#e2e8f0" strokeWidth="1.2" />
+                                        <path d="M-13,3 L0,-1 L13,3" fill="none" stroke="#cbd5e1" strokeWidth="1.2" strokeLinecap="round" />
+                                        {/* Cyan T-Shirt body */}
+                                        <path
+                                          d="M-13,3 L-18,9 L-13,12 L-10,7 L-10,25 L10,25 L10,7 L13,12 L18,9 L13,3 C8,6 -8,6 -13,3 Z"
+                                          fill="#00c7be"
+                                          stroke="#5ce5df"
+                                          strokeWidth="1.3"
+                                          opacity="0.95"
+                                        />
+                                        <path d="M-4,4 Q0,7 4,4" fill="none" stroke="#5ce5df" strokeWidth="1" />
+                                      </g>
+                                    </g>
+
+                                    {/* Item B: Orange Towel with Fluid Wave */}
+                                    <g
+                                      transform={`translate(${60 + rodWidth * 0.74}, ${y})`}
+                                      style={{ opacity: Math.max(0, Math.min(0.95, (rodPositionPercent - 18) / 24)), transition: 'opacity 0.35s ease-out' }}
+                                    >
+                                      <g className={`${swayClass} orange-fluid`} style={{ transformOrigin: '0px 0px', animationDelay: '0.2s' }}>
+                                        {/* Fold over rod */}
+                                        <rect x="-9" y="-2" width="18" height="5" rx="2.5" fill="#ffaa33" />
+                                        {/* Towel Body */}
+                                        <rect x="-8" y="2" width="16" height="23" rx="2" fill="#ff9500" stroke="#ffaa33" strokeWidth="1.3" opacity="0.95" />
+                                        <line x1="-7" y1="18" x2="7" y2="18" stroke="#ffe082" strokeWidth="1" />
+                                        <line x1="-7" y1="21" x2="7" y2="21" stroke="#ffe082" strokeWidth="1" />
+                                      </g>
+                                    </g>
+                                  </>
+                                )}
+
+                                {/* MIDDLE ROD: Purple T-Shirt & Teal Washcloth */}
+                                {idx === 1 && (
+                                  <>
+                                    {/* Item C: Purple T-Shirt */}
+                                    <g
+                                      transform={`translate(${60 + rodWidth * 0.48}, ${y})`}
+                                      style={{ opacity: Math.max(0, Math.min(0.95, (rodPositionPercent - 12) / 22)), transition: 'opacity 0.3s ease-out' }}
+                                    >
+                                      <g className={swayClass} style={{ transformOrigin: '0px 0px', animationDelay: '0.15s' }}>
+                                        <path d="M0,0 Q-2,-4 0,-7 Q3,-9 6,-6 Q7,-3 2,-1" fill="none" stroke="#e2e8f0" strokeWidth="1.2" />
+                                        <path d="M-13,3 L0,-1 L13,3" fill="none" stroke="#cbd5e1" strokeWidth="1.2" strokeLinecap="round" />
+                                        <path
+                                          d="M-13,3 L-18,9 L-13,12 L-10,7 L-10,25 L10,25 L10,7 L13,12 L18,9 L13,3 C8,6 -8,6 -13,3 Z"
+                                          fill="#af52de"
+                                          stroke="#d084f7"
+                                          strokeWidth="1.3"
+                                          opacity="0.95"
+                                        />
+                                        <path d="M-4,4 Q0,7 4,4" fill="none" stroke="#d084f7" strokeWidth="1" />
+                                      </g>
+                                    </g>
+
+                                    {/* Item D: Teal Hand Towel */}
+                                    <g
+                                      transform={`translate(${60 + rodWidth * 0.82}, ${y})`}
+                                      style={{ opacity: Math.max(0, Math.min(0.95, (rodPositionPercent - 22) / 25)), transition: 'opacity 0.3s ease-out' }}
+                                    >
+                                      <g className={swayClass} style={{ transformOrigin: '0px 0px', animationDelay: '0.25s' }}>
+                                        <rect x="-8" y="-2" width="16" height="5" rx="2.5" fill="#5ce5df" />
+                                        <rect x="-7" y="2" width="14" height="21" rx="2" fill="#00c7be" stroke="#5ce5df" strokeWidth="1.2" opacity="0.9" />
+                                        <line x1="-6" y1="18" x2="6" y2="18" stroke="#a7f3d0" strokeWidth="1" />
+                                      </g>
+                                    </g>
+                                  </>
+                                )}
+
+                                {/* BOTTOM ROD: Orange Drying Shorts & Purple Washcloth */}
+                                {idx === 2 && (
+                                  <>
+                                    {/* Item E: Orange Shorts with Pegs */}
+                                    <g
+                                      transform={`translate(${60 + rodWidth * 0.36}, ${y})`}
+                                      style={{ opacity: Math.max(0, Math.min(0.95, (rodPositionPercent - 10) / 20)), transition: 'opacity 0.35s ease-out' }}
+                                    >
+                                      <g className={`${swayClass} orange-fluid`} style={{ transformOrigin: '0px 0px', animationDelay: '0.1s' }}>
+                                        <rect x="-6" y="-3" width="2.2" height="5" rx="0.5" fill="#f1f5f9" />
+                                        <rect x="4" y="-3" width="2.2" height="5" rx="0.5" fill="#f1f5f9" />
+                                        <path
+                                          d="M-8,1 L8,1 L7,17 L1,17 L0,9 L-1,17 L-7,17 Z"
+                                          fill="#ff9500"
+                                          stroke="#ffaa33"
+                                          strokeWidth="1.3"
+                                          opacity="0.95"
+                                        />
+                                        <line x1="-8" y1="4" x2="8" y2="4" stroke="#ffe082" strokeWidth="0.9" />
+                                      </g>
+                                    </g>
+
+                                    {/* Item F: Purple Washcloth */}
+                                    <g
+                                      transform={`translate(${60 + rodWidth * 0.70}, ${y})`}
+                                      style={{ opacity: Math.max(0, Math.min(0.95, (rodPositionPercent - 16) / 22)), transition: 'opacity 0.3s ease-out' }}
+                                    >
+                                      <g className={swayClass} style={{ transformOrigin: '0px 0px', animationDelay: '0.3s' }}>
+                                        <rect x="-7" y="-2" width="14" height="5" rx="2.5" fill="#d084f7" />
+                                        <rect x="-6" y="2" width="12" height="18" rx="2" fill="#af52de" stroke="#d084f7" strokeWidth="1.2" opacity="0.9" />
+                                      </g>
+                                    </g>
+                                  </>
+                                )}
+                              </g>
+                            )}
+                          </g>
+                        );
+                      })}
+
+                      {/* ─── STRAIGHT HORIZONTAL AIRFLOW STREAMS ACROSS THE RACK (UNBENT) ─── */}
+                      {fanSpeed > 0 && rodPositionPercent > 5 && (
+                        <g opacity={fanSpeed === 1 ? 0.5 : fanSpeed === 2 ? 0.8 : 1.0}>
+                          {[
+                            { y: 74, delay: '0s', w: '1.4' },
+                            { y: 80, delay: '0.1s', w: '2.0' },
+                            { y: 101, delay: '0.05s', w: '1.4' },
+                            { y: 122, delay: '0.15s', w: '2.0' },
+                            { y: 143, delay: '0.08s', w: '1.4' },
+                            { y: 164, delay: '0.2s', w: '2.0' }
+                          ].map((line, idx) => (
+                            <line
+                              key={idx}
+                              x1="56"
+                              y1={line.y}
+                              x2={60 + (rodPositionPercent / 100) * 320}
+                              y2={line.y}
+                              stroke="#5ac8fa"
+                              strokeWidth={line.w}
+                              strokeDasharray="10 6"
+                              strokeLinecap="round"
+                              className={fanSpeed === 3 ? "wind-streaming-fast" : "wind-streaming"}
+                              style={{ animationDelay: line.delay }}
+                            />
+                          ))}
+                        </g>
+                      )}
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+
+              {/* SECTION 2: ACCESSORY CONTROLS (APPLE HOME TILES) */}
+              <div>
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <div className="flex items-center gap-1.5 text-white/95 font-bold text-base sm:text-lg">
+                    <span>Accessory Controls</span>
+                    <svg className="w-4 h-4 text-white/60" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <span className="text-xs text-white/70">Physical Controls</span>
+                </div>
+
+                {/* Apple Home 2 Primary Tiles Grid (Power & Smart Fan) */}
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+
+                  {/* TILE 1: POWER STATUS (READ-ONLY STATUS, TURNS WHITE WHEN ON) */}
+                  <div
+                    className={`apple-squircle p-4 flex items-center justify-between gap-3 select-none cursor-default transition-all duration-300 ${
+                      systemPower ? 'glass-tile-active' : 'glass-tile-inactive'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      {/* Status LED Badge */}
+                      <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                        !systemPower
+                          ? 'bg-white/10 text-white/50 border border-white/10'
+                          : powerState === 'Online'
+                          ? 'bg-[#00c7be] text-white shadow-md'
+                          : 'bg-[#34c759] text-white shadow-md'
+                      }`}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10" />
+                        </svg>
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className={`font-bold text-sm tracking-tight truncate ${systemPower ? 'text-slate-900' : 'text-white'}`}>
+                          Power Status
+                        </h4>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className={`w-2 h-2 rounded-full ${
+                            !systemPower
+                              ? 'bg-slate-400'
+                              : powerState === 'Online'
+                              ? 'bg-[#00c7be] animate-ping'
+                              : 'bg-[#34c759] animate-pulse'
+                          }`}></span>
+                          <p className={`text-xs font-medium truncate ${systemPower ? 'text-slate-600' : 'text-white/70'}`}>
+                            {powerState === 'Online' ? 'Online (Active)' : powerState === 'Standby' ? 'Standby (Ready)' : 'Offline'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full shrink-0 transition-colors ${
+                      !systemPower
+                        ? 'bg-white/10 text-white/50 border border-white/10'
+                        : powerState === 'Online'
+                        ? 'bg-cyan-100 text-cyan-800 border border-cyan-200'
+                        : 'bg-green-100 text-green-800 border border-green-200'
+                    }`}>
+                      {powerState.toUpperCase()}
+                    </span>
+                  </div>
+
+                  {/* TILE 2: OVERHEAD FAN (Cycles Off -> Low -> Med -> High) */}
+                  <div
+                    onClick={() => {
+                      if (!systemPower) return;
+                      if (rodPositionPercent <= 5) {
+                        addAlert('info', 'Rack is folded against wall. Extend rack before turning on fan.');
+                        return;
+                      }
+                      setFanSpeed(s => (s + 1) % 4);
+                    }}
+                    className={`apple-squircle p-4 cursor-pointer transition-all duration-300 flex items-center gap-3.5 select-none active:scale-[0.97] ${systemPower && fanSpeed > 0 ? 'glass-tile-active' : 'glass-tile-inactive'
+                      }`}
+                  >
+                    <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-colors ${systemPower && fanSpeed > 0 ? 'bg-[#00c7be] text-white shadow-md' : 'bg-white/15 text-white/70'
+                      }`}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={fanSpeed > 0 ? 'fan-medium' : ''}>
+                        <path d="M12 12c0-3 2.5-5.5 5.5-5.5S23 9 23 12s-2.5 5.5-5.5 5.5M12 12c-3 0-5.5-2.5-5.5-5.5S9 1 12 1s5.5 2.5 5.5 5.5M12 12c0 3-2.5 5.5-5.5 5.5S1 15 1 12s2.5-5.5 5.5-5.5M12 12c3 0 5.5 2.5 5.5 5.5S15 23 12 23s-5.5-2.5-5.5-5.5" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className={`font-bold text-sm tracking-tight truncate ${systemPower && fanSpeed > 0 ? 'text-slate-900' : 'text-white'}`}>
+                        Smart Fan
+                      </h4>
+                      <p className={`text-xs font-medium truncate ${systemPower && fanSpeed > 0 ? 'text-slate-500' : 'text-white/60'}`}>
+                        {fanSpeed > 0 ? FAN_LABELS[fanSpeed] : 'Off'}
+                      </p>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Clean Apple Home Rack Extension Slider Card */}
+                <div className="apple-squircle glass-tile-inactive p-4 sm:p-5 mt-3 space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/80 shrink-0">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 8L22 12L18 16" />
+                          <path d="M6 8L2 12L6 16" />
+                          <line x1="2" y1="12" x2="22" y2="12" />
+                        </svg>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-white/95 text-sm">Rack Extension</span>
+                        <p className="text-[11px] text-white/60">
+                          {rodPositionPercent <= 5 ? 'Folded to Wall' : rodPositionPercent <= 25 ? 'Rain-Safe Sheltered' : rodPositionPercent >= 95 ? 'Fully Extended' : 'Custom Stroke'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="font-bold text-white text-xs bg-white/15 px-3 py-1 rounded-full border border-white/10 shadow-sm">
+                      {Math.round(rodPositionPercent)}% • {(rodPositionPercent * 0.4).toFixed(1)} cm
+                    </span>
+                  </div>
+
+                  {/* Clean Slider Track */}
+                  <div className="py-1">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={rodPositionPercent}
+                      onChange={(e) => setRodTargetPercent(Number(e.target.value))}
+                      disabled={!systemPower || emergencyStop}
+                      className="w-full accent-white cursor-pointer h-2.5 bg-white/20 rounded-full appearance-none disabled:opacity-40 transition-all hover:bg-white/25"
+                    />
+                  </div>
+
+                  {/* Preset Pills (Apple Touch Chips) */}
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { label: 'Fold 0%', val: 0 },
+                      { label: 'Shelter 25%', val: 25, isShelter: true },
+                      { label: 'Half 50%', val: 50 },
+                      { label: 'Full 100%', val: 100 }
+                    ].map((btn) => {
+                      const isActive = Math.abs(rodPositionPercent - btn.val) <= 2;
+                      return (
+                        <button
+                          key={btn.val}
+                          onClick={() => setRodTargetPercent(btn.val)}
+                          disabled={!systemPower || emergencyStop}
+                          className={`py-2 px-1 rounded-full text-xs font-semibold transition-all duration-200 active:scale-95 disabled:opacity-40 border ${isActive
+                            ? btn.isShelter
+                              ? 'bg-[#ff9500] text-slate-950 border-[#ff9500] shadow-md shadow-[#ff9500]/25'
+                              : 'bg-white text-slate-950 border-white shadow-md'
+                            : btn.isShelter
+                              ? 'bg-[#ff9500]/15 hover:bg-[#ff9500]/25 text-[#ffaa33] border-[#ff9500]/30'
+                              : 'bg-white/10 hover:bg-white/20 text-white/90 border-white/10'
+                            }`}
+                        >
+                          {btn.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Drying Progress Bar (Apple Fitness Style) */}
+                <div className="apple-squircle glass-tile-inactive p-4 sm:p-5 mt-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <div>
+                      <h4 className="font-bold text-white/95">Drying Estimation</h4>
+                      <p className="text-[11px] text-white/60">Airflow: {FAN_LABELS[fanSpeed]} • Ambient: {humidityPercent}% Humidity</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold text-base text-white">{Math.round(dryingProgressPercent)}%</span>
+                      <span className="block text-[10px] text-white/60">{Math.ceil(remainingMinutes)} mins left</span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-black/40 h-2.5 rounded-full overflow-hidden p-0.5 border border-white/10">
+                    <div
+                      className="bg-gradient-to-r from-[#00c7be] via-[#007aff] to-[#34c759] h-full rounded-full transition-all duration-700"
+                      style={{ width: `${dryingProgressPercent}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+
+            {/* ────────────────── RIGHT COLUMN: SENSORS, SCENES & AUTOMATIONS (5 COLS) ────────────────── */}
+            <div className="lg:col-span-5 space-y-5">
+
+              {/* SECTION 1: CLIMATE & SENSORS (APPLE HOMEKIT HERO TILES) */}
+              <div>
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <div className="flex items-center gap-1.5 text-white/95 font-bold text-base sm:text-lg">
+                    <span>Climate & Sensors</span>
+                    <svg className="w-4 h-4 text-white/60" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <span className="text-xs text-white/70">Telemetry</span>
+                </div>
+
+                {/* 2x2 Grid with Thermostat & Weather Display Tiles (Display Only Telemetry) */}
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+
+                  {/* TILE 1: WEATHER & THERMOSTAT (DISPLAY ONLY) */}
+                  <div className="apple-squircle glass-tile-active p-4 flex flex-col justify-between min-h-[120px] select-none cursor-default">
+                    <div className="flex items-start justify-between">
+                      <div className="text-3xl sm:text-4xl font-extrabold text-[#ff9500] tracking-tight">
+                        {temperatureF}°
+                      </div>
+                      {/* Live Weather Indication Badge */}
+                      {rainDetected ? (
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-700 text-[10px] sm:text-[11px] font-bold">
+                          <svg className="w-3.5 h-3.5 text-blue-600 animate-bounce" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25" />
+                            <path d="M8 19v2M12 21v2M16 19v2" />
+                          </svg>
+                          <span>Rain Showers</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 text-[10px] sm:text-[11px] font-bold">
+                          <svg className="w-3.5 h-3.5 text-amber-500 animate-spin" style={{ animationDuration: '10s' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <circle cx="12" cy="12" r="4" />
+                            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+                          </svg>
+                          <span>Partly Cloudy</span>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-slate-900 tracking-tight">Thermostat & Weather</h4>
+                      <p className="text-xs font-medium text-slate-600">
+                        {temperatureC.toFixed(1)}°C • {rainDetected ? 'Precipitation' : 'Dry & Sunny'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* TILE 2: HUMIDITY (DISPLAY ONLY) */}
+                  <div className="apple-squircle glass-tile-inactive p-4 flex flex-col justify-between min-h-[120px] select-none cursor-default">
+                    <div className="flex items-start justify-between">
+                      <div className="text-3xl sm:text-4xl font-extrabold text-[#5ac8fa] tracking-tight">
+                        {humidityPercent}%
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 text-[10px] font-bold tracking-wide uppercase">
+                        {humidityPercent > 75 ? 'Damp Air' : 'Optimal'}
+                      </span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-white tracking-tight">Relative Humidity</h4>
+                      <p className="text-xs font-medium text-white/60">
+                        {humidityPercent > 75 ? 'High Moisture (Slow)' : 'Ideal for Air-Drying'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* TILE 3: RAIN SENSOR TELEMETRY (DISPLAY ONLY) */}
+                  <div className="apple-squircle glass-tile-inactive p-3.5 flex items-center justify-between gap-3 select-none cursor-default">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors ${rainDetected ? 'bg-[#007aff] text-white shadow-md' : 'bg-white/15 text-white/70'
+                        }`}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25" />
+                          <path d="M8 19v2M8 13v2M16 19v2M16 13v2M12 21v2M12 15v2" />
+                        </svg>
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-sm text-white tracking-tight truncate">Rain Sensor</h4>
+                        <p className="text-xs font-medium text-white/60 truncate">
+                          {rainDetected ? 'Rain Detected' : 'Dry Outdoor'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${rainDetected ? 'bg-blue-500/30 text-blue-300 border border-blue-400/40' : 'bg-green-500/20 text-green-300 border border-green-500/30'
+                      }`}>
+                      {rainDetected ? 'WET' : 'DRY'}
+                    </span>
+                  </div>
+
+                  {/* TILE 4: LAUNDRY LOAD CELL TELEMETRY (DISPLAY ONLY) */}
+                  <div className="apple-squircle glass-tile-inactive p-3.5 flex items-center justify-between gap-3 select-none cursor-default">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors ${laundryLoadKg > 5.0
+                          ? 'bg-[#ff3b30] text-white shadow-md'
+                          : laundryLoadKg >= 4.5
+                            ? 'bg-[#ff9500] text-white shadow-md'
+                            : 'bg-white/15 text-white/70'
+                        }`}>
+                        <span className="font-extrabold text-xs">kg</span>
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-sm text-white tracking-tight truncate">Laundry Load</h4>
+                        <p className="text-xs font-medium text-white/60 truncate">
+                          {laundryLoadKg.toFixed(1)} kg • Max 5kg
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 border transition-colors ${laundryLoadKg > 5.0
+                        ? 'bg-red-500/20 text-red-300 border-red-500/30 font-bold'
+                        : laundryLoadKg >= 4.5
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-bold'
+                          : 'text-white/60 bg-white/10 border-white/10'
+                      }`}>
+                      {Math.round((laundryLoadKg / 5.0) * 100)}%
+                    </span>
+                  </div>
+
+                </div>
+              </div>
+
+
+              {/* SECTION 2: SCENES (APPLE HOME DRYING MODES) */}
+              <div>
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <div className="flex items-center gap-1.5 text-white/95 font-bold text-base sm:text-lg">
+                    <span>Scenes & Modes</span>
+                    <svg className="w-4 h-4 text-white/60" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <span className="text-xs text-white/70">5 Presets</span>
+                </div>
+
+                {/* Scene Cards Stack */}
+                <div className="space-y-2">
+                  {Object.entries(MODES).map(([name, cfg]) => {
+                    const isSelected = selectedMode === name;
+                    return (
+                      <div
+                        key={name}
+                        onClick={() => handleSelectMode(name)}
+                        className={`apple-squircle p-3.5 cursor-pointer transition-all duration-300 flex items-center justify-between select-none active:scale-[0.98] ${isSelected ? 'glass-tile-active' : 'glass-tile-inactive'
+                          }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 pr-2">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'text-white shadow-md' : 'bg-white/15 text-white'
+                            }`} style={{ backgroundColor: isSelected ? cfg.color : undefined }}>
+                            <span className="text-xs font-bold">★</span>
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className={`font-bold text-sm truncate ${isSelected ? 'text-slate-900' : 'text-white'}`}>
+                              {name}
+                            </h4>
+                            <p className={`text-[11px] truncate ${isSelected ? 'text-slate-500' : 'text-white/60'}`}>
+                              Fan: {FAN_LABELS[cfg.fan]} • {cfg.desc}
+                            </p>
+                          </div>
+                        </div>
+
+                        <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded-full shrink-0 ${isSelected ? 'bg-slate-100 text-slate-800' : 'bg-white/10 text-white/80'
+                          }`}>
+                          {cfg.timer}m
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+
+              {/* SECTION 3: AUTOMATION & DEMO SIMULATION */}
+              <div>
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <div className="flex items-center gap-1.5 text-white/95 font-bold text-base sm:text-lg">
+                    <span>Automations & Safety</span>
+                    <svg className="w-4 h-4 text-white/60" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <span className="text-xs text-white/70">ENT600 Demo</span>
+                </div>
+
+                {/* SCENE DEMO: 3-TIER POWER & SYSTEM STATE DEMO SWITCHER */}
+                <div className="mb-2.5 p-3 rounded-2xl bg-black/25 backdrop-blur-xl border border-white/15">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-white/95">⚡ Scene Demo: Power State</span>
+                    <span className="text-[10px] font-mono font-bold text-[#5ac8fa]">Active: {powerState}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => handleDemoPowerState('Standby')}
+                      className={`py-1.5 px-2 rounded-xl text-xs font-semibold transition active:scale-95 border flex items-center justify-center gap-1.5 ${powerState === 'Standby'
+                        ? 'bg-[#34c759] text-slate-950 border-[#34c759] shadow-md font-bold'
+                        : 'bg-white/10 hover:bg-white/20 text-white/80 border-white/10'
+                        }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${powerState === 'Standby' ? 'bg-slate-950' : 'bg-[#34c759]'}`}></span>
+                      <span>Standby</span>
+                    </button>
+                    <button
+                      onClick={() => handleDemoPowerState('Online')}
+                      className={`py-1.5 px-2 rounded-xl text-xs font-semibold transition active:scale-95 border flex items-center justify-center gap-1.5 ${powerState === 'Online'
+                        ? 'bg-[#00c7be] text-slate-950 border-[#00c7be] shadow-md font-bold'
+                        : 'bg-white/10 hover:bg-white/20 text-white/80 border-white/10'
+                        }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${powerState === 'Online' ? 'bg-slate-950' : 'bg-[#00c7be]'}`}></span>
+                      <span>Online</span>
+                    </button>
+                    <button
+                      onClick={() => handleDemoPowerState('Offline')}
+                      className={`py-1.5 px-2 rounded-xl text-xs font-semibold transition active:scale-95 border flex items-center justify-center gap-1.5 ${powerState === 'Offline'
+                        ? 'bg-slate-400 text-slate-950 border-slate-400 shadow-md font-bold'
+                        : 'bg-white/10 hover:bg-white/20 text-white/80 border-white/10'
+                        }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${powerState === 'Offline' ? 'bg-slate-950' : 'bg-slate-500'}`}></span>
+                      <span>Offline</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    onClick={() => handleSimulateRain(!rainDetected)}
+                    className="apple-squircle p-3 bg-black/25 backdrop-blur-xl border border-white/15 hover:bg-black/35 text-left transition active:scale-95"
+                  >
+                    <div className="text-xs font-bold text-white">🌧 Test Rain Sensor</div>
+                    <div className="text-[11px] text-white/60">{rainDetected ? 'Clear Weather' : 'Simulate Rain (25%)'}</div>
+                  </button>
+
+                  <button
+                    onClick={() => handleSimulateObstacle(!obstacleDetected)}
+                    className="apple-squircle p-3 bg-black/25 backdrop-blur-xl border border-white/15 hover:bg-black/35 text-left transition active:scale-95"
+                  >
+                    <div className="text-xs font-bold text-white">⚠ Test Obstacle Lock</div>
+                    <div className="text-[11px] text-white/60">{obstacleDetected ? 'Clear Obstacle' : 'Trigger Obstacle'}</div>
+                  </button>
+
+                  <button
+                    onClick={() => setAutoRainProtection(p => !p)}
+                    className="apple-squircle p-3 bg-black/25 backdrop-blur-xl border border-white/15 hover:bg-black/35 text-left transition active:scale-95"
+                  >
+                    <div className="text-xs font-bold text-white">☂ Auto Rain Guard</div>
+                    <div className="text-[11px] text-white/60">{autoRainProtection ? 'Enabled (25% Safe)' : 'Disabled'}</div>
+                  </button>
+
+                  <button
+                    onClick={handleResetDemo}
+                    className="apple-squircle p-3 bg-black/25 backdrop-blur-xl border border-white/15 hover:bg-black/35 text-left transition active:scale-95"
+                  >
+                    <div className="text-xs font-bold text-white">↺ Reset All States</div>
+                    <div className="text-[11px] text-white/60">Restore Defaults</div>
+                  </button>
+                </div>
+              </div>
+
+
+              {/* SECTION 4: ACTIVITY LOG (APPLE HOME NOTIFICATION STREAM) */}
+              <div>
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <div className="flex items-center gap-1.5 text-white/95 font-bold text-base sm:text-lg">
+                    <span>Recent Activity</span>
+                    <svg className="w-4 h-4 text-white/60" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <button onClick={() => setAlerts([])} className="text-xs text-white/70 hover:text-white underline">
+                    Clear
+                  </button>
+                </div>
+
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {alerts.map(a => (
+                    <div
+                      key={a.id}
+                      className="apple-squircle-sm px-3.5 py-2 bg-black/30 backdrop-blur-xl border border-white/10 text-xs flex items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${a.level === 'critical' ? 'bg-[#ff3b30]' :
+                          a.level === 'high' ? 'bg-[#007aff]' : 'bg-[#34c759]'
+                          }`}></span>
+                        <span className="text-white/90 truncate">{a.text}</span>
+                      </div>
+                      <span className="text-[10px] text-white/50 shrink-0 font-mono">{a.time}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* ═══════════ APPLE HOME FOOTER ═══════════ */}
+          <footer className="text-center text-xs text-white/60 pt-4 pb-2">
+            <p>CLOTHESLINE — SMART DRY • Designed with Apple HomeKit Human Interface Guidelines</p>
+          </footer>
+
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<AppleHomeApp />);
+  </script>
+</body>
+
+</html>

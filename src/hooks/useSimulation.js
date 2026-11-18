@@ -53,6 +53,8 @@ export default function useSimulation() {
   const stateRef = useRef(state);
   stateRef.current = state;
 
+  // Track the timestamp of the last local user input on THIS specific device
+  const lastLocalInputTimeRef = useRef(0);
   const iotSyncRef = useRef(null);
 
   // ─── alerts helper ──────────────────────────────────
@@ -125,16 +127,20 @@ export default function useSimulation() {
   const execTogglePower = useCallback((isRemote = false) => {
     setState(prev => {
       const next = !prev.systemPower;
+      const nextState = {
+        ...prev,
+        systemPower: next,
+        ...(next ? {} : { fanSpeed: 0, motorStatus: 'Idle', timerRunning: false })
+      };
       if (!isRemote) {
+        lastLocalInputTimeRef.current = Date.now();
         addAlert('info', next ? 'Smart Rack online: Standby.' : 'Smart Rack offline.');
         iotSyncRef.current?.publishAction('TOGGLE_POWER', { systemPower: next });
+        iotSyncRef.current?.broadcastState(nextState);
       } else {
         addAlert('info', next ? '📱 Remote: Smart Rack powered ON.' : '📱 Remote: Smart Rack turned OFF.');
       }
-      if (!next) {
-        return { ...prev, systemPower: false, fanSpeed: 0, motorStatus: 'Idle', timerRunning: false };
-      }
-      return { ...prev, systemPower: true };
+      return nextState;
     });
   }, [addAlert]);
 
@@ -147,13 +153,16 @@ export default function useSimulation() {
         }
         return prev;
       }
+      const nextState = { ...prev, fanSpeed: speed };
       if (!isRemote) {
+        lastLocalInputTimeRef.current = Date.now();
         addAlert('info', `Fan speed set to ${FAN_LABELS[speed]}.`);
         iotSyncRef.current?.publishAction('SET_FAN_SPEED', { speed });
+        iotSyncRef.current?.broadcastState(nextState);
       } else {
         addAlert('info', `📱 Remote: Fan speed set to ${FAN_LABELS[speed]}.`);
       }
-      return { ...prev, fanSpeed: speed };
+      return nextState;
     });
   }, [addAlert]);
 
@@ -168,7 +177,13 @@ export default function useSimulation() {
       });
     }
     if (!isRemote) {
+      lastLocalInputTimeRef.current = Date.now();
       iotSyncRef.current?.publishAction('SET_ROD_TARGET', { percent: pct });
+      iotSyncRef.current?.broadcastState({
+        ...stateRef.current,
+        rodTargetPercent: pct,
+        motorStatus: 'Moving'
+      });
     } else {
       addAlert('info', `📱 Remote: Rack stroke adjusted to ${Math.round(pct)}%.`);
     }
@@ -176,24 +191,31 @@ export default function useSimulation() {
   }, [animateRod, addAlert]);
 
   const execSetPowerStateDemo = useCallback((targetState, isRemote = false) => {
+    if (!isRemote) {
+      lastLocalInputTimeRef.current = Date.now();
+      iotSyncRef.current?.publishAction('SET_POWER_STATE_DEMO', { targetState });
+    }
     if (targetState === 'Standby') {
-      setState(prev => ({
-        ...prev,
-        systemPower: true,
-        fanSpeed: 0,
-        timerRunning: false,
-        motorStatus: 'Idle'
-      }));
-      if (!isRemote) {
-        addAlert('info', 'Scene Demo: System is in STANDBY (Connected, ready).');
-        iotSyncRef.current?.publishAction('SET_POWER_STATE_DEMO', { targetState });
-      } else {
-        addAlert('info', '📱 Remote: System switched to STANDBY.');
-      }
+      setState(prev => {
+        const next = {
+          ...prev,
+          systemPower: true,
+          fanSpeed: 0,
+          timerRunning: false,
+          motorStatus: 'Idle'
+        };
+        if (!isRemote) {
+          addAlert('info', 'Scene Demo: System is in STANDBY (Connected, ready).');
+          iotSyncRef.current?.broadcastState(next);
+        } else {
+          addAlert('info', '📱 Remote: System switched to STANDBY.');
+        }
+        return next;
+      });
     } else if (targetState === 'Online') {
       setState(prev => {
         const nextPos = prev.rodPositionPercent <= 5 ? 75 : prev.rodPositionPercent;
-        return {
+        const next = {
           ...prev,
           systemPower: true,
           rodPositionPercent: nextPos,
@@ -202,41 +224,54 @@ export default function useSimulation() {
           timerRunning: true,
           motorStatus: 'Idle'
         };
+        if (!isRemote) {
+          addAlert('info', 'Scene Demo: System is ONLINE (Active drying cycle).');
+          iotSyncRef.current?.broadcastState(next);
+        } else {
+          addAlert('info', '📱 Remote: System switched to ONLINE.');
+        }
+        return next;
       });
-      if (!isRemote) {
-        addAlert('info', 'Scene Demo: System is ONLINE (Active drying cycle).');
-        iotSyncRef.current?.publishAction('SET_POWER_STATE_DEMO', { targetState });
-      } else {
-        addAlert('info', '📱 Remote: System switched to ONLINE.');
-      }
     } else if (targetState === 'Offline') {
-      setState(prev => ({
-        ...prev,
-        systemPower: false,
-        fanSpeed: 0,
-        timerRunning: false,
-        motorStatus: 'Idle'
-      }));
-      if (!isRemote) {
-        addAlert('info', 'Scene Demo: System is OFFLINE (Power disconnected).');
-        iotSyncRef.current?.publishAction('SET_POWER_STATE_DEMO', { targetState });
-      } else {
-        addAlert('info', '📱 Remote: System switched to OFFLINE.');
-      }
+      setState(prev => {
+        const next = {
+          ...prev,
+          systemPower: false,
+          fanSpeed: 0,
+          timerRunning: false,
+          motorStatus: 'Idle'
+        };
+        if (!isRemote) {
+          addAlert('info', 'Scene Demo: System is OFFLINE (Power disconnected).');
+          iotSyncRef.current?.broadcastState(next);
+        } else {
+          addAlert('info', '📱 Remote: System switched to OFFLINE.');
+        }
+        return next;
+      });
     }
   }, [addAlert]);
 
   const execEmergencyStopToggle = useCallback((isRemote = false) => {
     setState(prev => {
       const stopping = !prev.emergencyStop;
+      const nextState = {
+        ...prev,
+        emergencyStop: stopping,
+        motorStatus: stopping ? 'Stopped' : 'Idle',
+        ...(stopping ? { timerRunning: false } : {})
+      };
       if (stopping) {
         addAlert('critical', isRemote ? '🚨 Remote Action: Emergency Stop triggered!' : 'Emergency Stop activated. All movement halted.');
-        if (!isRemote) iotSyncRef.current?.publishAction('EMERGENCY_STOP', { emergencyStop: true });
-        return { ...prev, emergencyStop: true, motorStatus: 'Stopped', timerRunning: false };
+      } else {
+        addAlert('info', isRemote ? '📱 Remote: Emergency Stop released.' : 'Emergency Stop released.');
       }
-      addAlert('info', isRemote ? '📱 Remote: Emergency Stop released.' : 'Emergency Stop released.');
-      if (!isRemote) iotSyncRef.current?.publishAction('EMERGENCY_STOP', { emergencyStop: false });
-      return { ...prev, emergencyStop: false, motorStatus: 'Idle' };
+      if (!isRemote) {
+        lastLocalInputTimeRef.current = Date.now();
+        iotSyncRef.current?.publishAction('EMERGENCY_STOP', { emergencyStop: stopping });
+        iotSyncRef.current?.broadcastState(nextState);
+      }
+      return nextState;
     });
   }, [addAlert]);
 
@@ -246,17 +281,7 @@ export default function useSimulation() {
     setState(prev => {
       if (!prev.systemPower) return prev;
       const targetLoad = mode.loadKg ?? prev.laundryLoadKg;
-      if (!isRemote) {
-        if (modeName === 'Heavy Laundry') {
-          addAlert('info', `Scene set: Heavy Laundry. Load sensor updated to ${targetLoad} kg (92% load).`);
-        } else {
-          addAlert('info', `Mode activated: ${modeName} (${targetLoad} kg load).`);
-        }
-        iotSyncRef.current?.publishAction('SELECT_MODE', { modeName });
-      } else {
-        addAlert('info', `📱 Remote: Scene changed to ${modeName}.`);
-      }
-      return {
+      const nextState = {
         ...prev,
         selectedMode: modeName,
         fanSpeed: mode.fan,
@@ -265,7 +290,22 @@ export default function useSimulation() {
         dryingProgressPercent: 0,
         timerRunning: true,
         laundryLoadKg: targetLoad,
+        rodTargetPercent: mode.rod,
+        motorStatus: 'Moving'
       };
+      if (!isRemote) {
+        lastLocalInputTimeRef.current = Date.now();
+        if (modeName === 'Heavy Laundry') {
+          addAlert('info', `Scene set: Heavy Laundry. Load sensor updated to ${targetLoad} kg (92% load).`);
+        } else {
+          addAlert('info', `Mode activated: ${modeName} (${targetLoad} kg load).`);
+        }
+        iotSyncRef.current?.publishAction('SELECT_MODE', { modeName });
+        iotSyncRef.current?.broadcastState(nextState);
+      } else {
+        addAlert('info', `📱 Remote: Scene changed to ${modeName}.`);
+      }
+      return nextState;
     });
     animateRod(mode.rod);
   }, [addAlert, animateRod]);
@@ -273,8 +313,13 @@ export default function useSimulation() {
   const execToggleAutoRain = useCallback((isRemote = false) => {
     setState(prev => {
       const next = !prev.autoRainProtection;
-      if (!isRemote) iotSyncRef.current?.publishAction('TOGGLE_AUTO_RAIN', { autoRainProtection: next });
-      return { ...prev, autoRainProtection: next };
+      const nextState = { ...prev, autoRainProtection: next };
+      if (!isRemote) {
+        lastLocalInputTimeRef.current = Date.now();
+        iotSyncRef.current?.publishAction('TOGGLE_AUTO_RAIN', { autoRainProtection: next });
+        iotSyncRef.current?.broadcastState(nextState);
+      }
+      return nextState;
     });
   }, []);
 
@@ -287,13 +332,22 @@ export default function useSimulation() {
           next.rodTargetPercent = prev.shelteredPositionPercent;
           next.motorStatus = 'Moving';
         }
-        if (!isRemote) iotSyncRef.current?.publishAction('SIMULATE_RAIN', { on: true });
+        if (!isRemote) {
+          lastLocalInputTimeRef.current = Date.now();
+          iotSyncRef.current?.publishAction('SIMULATE_RAIN', { on: true });
+          iotSyncRef.current?.broadcastState(next);
+        }
         return next;
       }
       if (!on && prev.rainDetected) {
         addAlert('info', isRemote ? '☀️ Remote: Rain cleared.' : 'Rain stopped. Dry weather resumed.');
-        if (!isRemote) iotSyncRef.current?.publishAction('SIMULATE_RAIN', { on: false });
-        return { ...prev, rainDetected: false };
+        const next = { ...prev, rainDetected: false };
+        if (!isRemote) {
+          lastLocalInputTimeRef.current = Date.now();
+          iotSyncRef.current?.publishAction('SIMULATE_RAIN', { on: false });
+          iotSyncRef.current?.broadcastState(next);
+        }
+        return next;
       }
       return prev;
     });
@@ -303,12 +357,22 @@ export default function useSimulation() {
     setState(prev => {
       if (on) {
         addAlert('critical', isRemote ? '⚠️ Remote: Obstacle sensor tripped!' : 'Movement stopped. Please check the drying rack.');
-        if (!isRemote) iotSyncRef.current?.publishAction('SIMULATE_OBSTACLE', { on: true });
-        return { ...prev, obstacleDetected: true, motorStatus: 'Stopped' };
+        const next = { ...prev, obstacleDetected: true, motorStatus: 'Stopped' };
+        if (!isRemote) {
+          lastLocalInputTimeRef.current = Date.now();
+          iotSyncRef.current?.publishAction('SIMULATE_OBSTACLE', { on: true });
+          iotSyncRef.current?.broadcastState(next);
+        }
+        return next;
       }
       addAlert('info', isRemote ? '✅ Remote: Obstacle cleared.' : 'Obstacle cleared.');
-      if (!isRemote) iotSyncRef.current?.publishAction('SIMULATE_OBSTACLE', { on: false });
-      return { ...prev, obstacleDetected: false, motorStatus: 'Idle' };
+      const next = { ...prev, obstacleDetected: false, motorStatus: 'Idle' };
+      if (!isRemote) {
+        lastLocalInputTimeRef.current = Date.now();
+        iotSyncRef.current?.publishAction('SIMULATE_OBSTACLE', { on: false });
+        iotSyncRef.current?.broadcastState(next);
+      }
+      return next;
     });
   }, [addAlert]);
 
@@ -316,8 +380,10 @@ export default function useSimulation() {
     setState({ ...INITIAL_STATE });
     setAlerts([]);
     if (!isRemote) {
+      lastLocalInputTimeRef.current = Date.now();
       addAlert('info', 'Demo reset to initial state.');
       iotSyncRef.current?.publishAction('RESET_DEMO', {});
+      iotSyncRef.current?.broadcastState({ ...INITIAL_STATE });
     } else {
       addAlert('info', '📱 Remote: Demo reset to initial defaults.');
     }
@@ -329,8 +395,11 @@ export default function useSimulation() {
       const { type, payload } = action;
 
       if (type === 'PEER_REQUESTED_STATE') {
-        // Broadcast current state so newly connected device catches up immediately
-        iotSyncRef.current?.broadcastState(stateRef.current);
+        // Only broadcast if this device had user input within last 2 minutes
+        const timeSinceInput = Date.now() - lastLocalInputTimeRef.current;
+        if (timeSinceInput < 120000) {
+          iotSyncRef.current?.broadcastState(stateRef.current);
+        }
         return;
       }
 
@@ -372,11 +441,15 @@ export default function useSimulation() {
 
     const handleStateSnapshot = (incomingState) => {
       if (!incomingState) return;
+      // Guard: If THIS device had user input within the last 2.5 seconds, do NOT override with incoming snapshot!
+      const timeSinceInput = Date.now() - lastLocalInputTimeRef.current;
+      if (timeSinceInput < 2500) {
+        return;
+      }
       setState(prev => ({
         ...prev,
         ...incomingState,
       }));
-      addAlert('info', '☁️ Synced live state from Home Cloud.');
     };
 
     const sync = new IoTCloudSync(
@@ -455,14 +528,23 @@ export default function useSimulation() {
     return () => clearInterval(interval);
   }, [addAlert]);
 
-  // Periodic state snapshot broadcast to broker (retained) so any fresh browser tab joins seamlessly
+  // ─── PERIODIC SYNC: ONLY BY THE DEVICE WITH USER INPUT FROM TIME TO TIME ───
   useEffect(() => {
-    const broadcastInterval = setInterval(() => {
-      if (iotSyncRef.current && syncStatus === 'connected') {
+    const syncInterval = setInterval(() => {
+      const timeSinceInput = Date.now() - lastLocalInputTimeRef.current;
+      const isDeviceActiveWithInput = timeSinceInput < 45000; // active within last 45s
+
+      // ONLY broadcast if this device was the one receiving input and a cycle or movement is running
+      if (
+        iotSyncRef.current &&
+        syncStatus === 'connected' &&
+        isDeviceActiveWithInput &&
+        (stateRef.current.timerRunning || stateRef.current.motorStatus === 'Moving')
+      ) {
         iotSyncRef.current.broadcastState(stateRef.current);
       }
     }, 4000);
-    return () => clearInterval(broadcastInterval);
+    return () => clearInterval(syncInterval);
   }, [syncStatus]);
 
   return {

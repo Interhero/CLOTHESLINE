@@ -289,6 +289,7 @@
       const [copiedLink, setCopiedLink] = useState(false);
       const [roomInput, setRoomInput] = useState(homeId);
       const iotClientRef = useRef(null);
+      const lastLocalInputTimeRef = useRef(0);
 
       const [systemPower, setSystemPower] = useState(true);
       const [fanSpeed, setFanSpeed] = useState(2);
@@ -422,6 +423,7 @@
 
       // ─── Real-Time Multi-Device IoT Cloud Synchronization ───
       const publishAction = useCallback((type, payload = {}) => {
+        lastLocalInputTimeRef.current = Date.now();
         if (!iotClientRef.current || syncStatus !== 'connected') return;
         try {
           const msg = { type, payload, senderId: CLIENT_ID, timestamp: Date.now() };
@@ -469,27 +471,29 @@
 
               if (topic === `${topicPrefix}/actions`) {
                 if (data.type === 'REQUEST_STATE') {
-                  // Broadcast state snapshot
-                  const snapshot = {
-                    systemPower,
-                    fanSpeed,
-                    rodPositionPercent,
-                    rodTargetPercent,
-                    rainDetected,
-                    autoRainProtection,
-                    shelteredPositionPercent,
-                    laundryLoadKg,
-                    selectedMode,
-                    motorStatus,
-                    obstacleDetected,
-                    emergencyStop,
-                    timerRunning
-                  };
-                  client.publish(`${topicPrefix}/state`, JSON.stringify({
-                    state: snapshot,
-                    senderId: CLIENT_ID,
-                    timestamp: Date.now()
-                  }), { qos: 0, retain: true });
+                  const timeSinceInput = Date.now() - lastLocalInputTimeRef.current;
+                  if (timeSinceInput < 120000) {
+                    const snapshot = {
+                      systemPower,
+                      fanSpeed,
+                      rodPositionPercent,
+                      rodTargetPercent,
+                      rainDetected,
+                      autoRainProtection,
+                      shelteredPositionPercent,
+                      laundryLoadKg,
+                      selectedMode,
+                      motorStatus,
+                      obstacleDetected,
+                      emergencyStop,
+                      timerRunning
+                    };
+                    client.publish(`${topicPrefix}/state`, JSON.stringify({
+                      state: snapshot,
+                      senderId: CLIENT_ID,
+                      timestamp: Date.now()
+                    }), { qos: 0, retain: true });
+                  }
                 } else {
                   handleRemoteAction(data);
                 }
@@ -516,6 +520,42 @@
           }
         };
       }, [homeId]);
+
+      // Periodic state sync: Only performed by the device with recent user input from time to time
+      useEffect(() => {
+        const syncInterval = setInterval(() => {
+          const timeSinceInput = Date.now() - lastLocalInputTimeRef.current;
+          const isDeviceActiveWithInput = timeSinceInput < 45000;
+          if (
+            iotClientRef.current &&
+            syncStatus === 'connected' &&
+            isDeviceActiveWithInput &&
+            (timerRunning || motorStatus === 'Moving')
+          ) {
+            const snapshot = {
+              systemPower,
+              fanSpeed,
+              rodPositionPercent,
+              rodTargetPercent,
+              rainDetected,
+              autoRainProtection,
+              shelteredPositionPercent,
+              laundryLoadKg,
+              selectedMode,
+              motorStatus,
+              obstacleDetected,
+              emergencyStop,
+              timerRunning
+            };
+            iotClientRef.current.publish(`ent600/clothesline/${homeId}/state`, JSON.stringify({
+              state: snapshot,
+              senderId: CLIENT_ID,
+              timestamp: Date.now()
+            }), { qos: 0, retain: true });
+          }
+        }, 4000);
+        return () => clearInterval(syncInterval);
+      }, [syncStatus, homeId, systemPower, fanSpeed, rodPositionPercent, rodTargetPercent, rainDetected, autoRainProtection, shelteredPositionPercent, laundryLoadKg, selectedMode, motorStatus, obstacleDetected, emergencyStop, timerRunning]);
 
       const handleRemoteAction = (action) => {
         const { type, payload } = action;
@@ -563,6 +603,8 @@
 
       const handleRemoteSnapshot = (snap) => {
         if (!snap) return;
+        const timeSinceInput = Date.now() - lastLocalInputTimeRef.current;
+        if (timeSinceInput < 2500) return; // Don't override active user touch
         if (snap.systemPower !== undefined) setSystemPower(snap.systemPower);
         if (snap.fanSpeed !== undefined) setFanSpeed(snap.fanSpeed);
         if (snap.rodPositionPercent !== undefined) setRodPositionPercent(snap.rodPositionPercent);
@@ -572,7 +614,6 @@
         if (snap.laundryLoadKg !== undefined) setLaundryLoadKg(snap.laundryLoadKg);
         if (snap.selectedMode !== undefined) setSelectedMode(snap.selectedMode);
         if (snap.emergencyStop !== undefined) setEmergencyStop(snap.emergencyStop);
-        addAlert('info', '☁️ Synced live state from Home Cloud.');
       };
 
       // Handlers
